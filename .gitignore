@@ -17,3 +17,18 @@ uv.lock
 .vscode/
 *.swp
 *.swo
+
+# Playwright MCP transient outputs
+.playwright-mcp/
+
+# Internal-only setup notes (contains private infrastructure references)
+SETUP_INTERNAL.md
+
+# Eval driver scripts with hardcoded absolute paths
+run_tuned_eval.py
+run_tuned_eval_retry.py
+run_tuned_eval_sequential.py
+
+# Allow committing kombo eval dataset (kombo is a public site)
+!eval_images/**/*.png
+!eval_results/**/*.png

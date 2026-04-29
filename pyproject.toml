@@ -1,6 +1,6 @@
 [project]
 name = "vision-sidecar-mcp"
-version = "0.1.0"
+version = "0.2.2"
 description = "MCP server that gives AI agents vision capabilities via Ollama VLM"
 readme = "README.md"
 license = "MIT"
