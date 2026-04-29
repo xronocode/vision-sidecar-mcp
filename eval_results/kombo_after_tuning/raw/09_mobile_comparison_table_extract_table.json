@@ -1,0 +1,56 @@
+{
+  "image": {
+    "path": "~/prj/vision-sidecar-mcp/eval_images/kombo/09_mobile_comparison_table.png",
+    "size_bytes": 82635,
+    "size_mb": 0.08,
+    "mime": "image/png",
+    "modified": "2026-04-28T11:53:13.918146+00:00"
+  },
+  "model": "qwen3-vl:8b",
+  "preprocess": {
+    "original_size": [
+      390,
+      844
+    ],
+    "upscaled": true,
+    "factor": 2,
+    "new_size": [
+      780,
+      1688
+    ],
+    "method": "Lanczos"
+  },
+  "table": {
+    "present": true,
+    "row_count": 5,
+    "col_count": 3,
+    "header_row": [
+      "",
+      "kombo",
+      "Prodigy"
+    ],
+    "rows": [
+      [
+        "Scope",
+        "Focused on math facts",
+        "Full curriculum K-8"
+      ],
+      [
+        "Core skill",
+        "Speed and retention",
+        "Conceptual understanding"
+      ],
+      [
+        "Complexity",
+        "Start in 5 seconds",
+        "Setup and onboarding"
+      ],
+      [
+        "Philosophy",
+        "Free, no ads, no paywalls",
+        "Freemium with membership"
+      ]
+    ]
+  },
+  "wall_seconds": 10.94
+}

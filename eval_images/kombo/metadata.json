@@ -1,0 +1,124 @@
+{
+  "dataset": "kombo",
+  "url": "https://kombo-41e.pages.dev/",
+  "captured_at": "2026-04-28",
+  "tool": "Playwright MCP @playwright/mcp",
+  "notes": [
+    "Site is a single short marketing page. Total document height ranges from 1873px (1440x900) to 2831px (320x568).",
+    "All scrolling is element-based: scroll the eyebrow label or table element to ~60-80px from viewport top.",
+    "Screenshots 03_desktop_how_it_works.png and 04_desktop_comparison_table.png are byte-identical (same MD5). At 1440x900 the document is only 1873px tall, so the page bottoms out at scrollY=973 and both 'How it works' and 'Why kombo' sections appear together; we cannot frame them separately with viewport-only screenshots. Documented honestly rather than faked.",
+    "Mobile comparison table screenshot (09) bottomed out (maxScroll=1699 vs target=2058), so the top of the frame still includes the 'How it works' cards above the table."
+  ],
+  "screenshots": [
+    {
+      "filename": "01_desktop_hero.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 1440,
+      "viewport_height": 900,
+      "scroll_target": "top",
+      "actual_section_captured": "Top nav (kombo / Play / Progress) + hero card (READY TO PLAY eyebrow, H1 'The math RPG where you build a kingdom', subhead, three CTAs Start playing / I'm a parent / I'm a teacher, 'No sign-up required' note, purple egg illustration). Below the fold: top of FOR KIDS card.",
+      "purpose": "Hero section, main headline, navigation, CTA, visual hierarchy",
+      "capture_method": "browser_resize(1440,900) -> window.scrollTo(0,0) -> 400ms wait -> browser_take_screenshot",
+      "timestamp": "2026-04-28T17:48:28Z"
+    },
+    {
+      "filename": "02_desktop_audience_sections.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 1440,
+      "viewport_height": 900,
+      "scroll_target": "FOR KIDS eyebrow",
+      "actual_section_captured": "All three audience cards stacked vertically (FOR KIDS / Not a test - an adventure, FOR PARENTS / Math practice without the nagging + 'Join the parent waitlist ->', FOR TEACHERS / Zero prep, full visibility + 'Join the teacher waitlist ->'). Bottom edge clips into HOW IT WORKS step cards.",
+      "purpose": "Audience cards, section structure, text extraction",
+      "capture_method": "scrollIntoView via window.scrollTo(0, eyebrowY-60), scrollY=565, 400ms wait",
+      "timestamp": "2026-04-28T17:51:06Z"
+    },
+    {
+      "filename": "03_desktop_how_it_works.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 1440,
+      "viewport_height": 900,
+      "scroll_target": "HOW IT WORKS eyebrow (clamped to maxScroll)",
+      "actual_section_captured": "Tail of FOR PARENTS waitlist link + full FOR TEACHERS card + HOW IT WORKS section with 4 step cards (Practice math, Earn Sparks, Build kingdom, Want more) + WHY KOMBO comparison table (4 rows: Scope, Core skill, Complexity, Philosophy; columns: kombo, Prodigy).",
+      "purpose": "Step sequence, icons, process interpretation",
+      "capture_method": "scrollY clamped to maxScroll=973 (target was 1279); page is too short to isolate this section. 400ms wait.",
+      "timestamp": "2026-04-28T17:51:23Z"
+    },
+    {
+      "filename": "04_desktop_comparison_table.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 1440,
+      "viewport_height": 900,
+      "scroll_target": "<table> element (clamped to maxScroll)",
+      "actual_section_captured": "BYTE-IDENTICAL to 03_desktop_how_it_works.png (same MD5 a444572cb759b0b68bebcf7a8bec8958). Page bottoms out at the same scrollY=973 because tableY=1588 > maxScroll=973. Same content visible.",
+      "purpose": "Table OCR, row/column extraction, comparison logic",
+      "capture_method": "Targeted document.querySelector('table'); scrollTo clamped to maxScroll=973. Identical viewport pixels to screenshot 03.",
+      "timestamp": "2026-04-28T17:51:45Z"
+    },
+    {
+      "filename": "05_tablet_portrait_hero.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 768,
+      "viewport_height": 1024,
+      "scroll_target": "top",
+      "actual_section_captured": "Top nav + hero card (READY TO PLAY, H1 wrapping over two lines 'The math RPG where / you build a kingdom', subhead, three CTAs wrapped on one line, 'No sign-up required'). Egg illustration not visible at this width (hidden by responsive layout). Below the fold: FOR KIDS card and start of FOR PARENTS card.",
+      "purpose": "Tablet portrait hero layout, CTA visibility, text wrapping",
+      "capture_method": "browser_resize(768,1024) -> scrollTo(0,0) -> 400ms wait",
+      "timestamp": "2026-04-28T17:52:16Z"
+    },
+    {
+      "filename": "06_tablet_landscape_sections.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 1024,
+      "viewport_height": 768,
+      "scroll_target": "FOR KIDS eyebrow",
+      "actual_section_captured": "All three audience cards visible vertically (FOR KIDS, FOR PARENTS with 'Join the parent waitlist ->', FOR TEACHERS with 'Join the teacher waitlist ->'). Tiny strip of next section at bottom edge.",
+      "purpose": "Intermediate responsive layout, cards/sections behavior",
+      "capture_method": "browser_resize(1024,768) -> scrollTo(0, eyebrowY-60), scrollY=625",
+      "timestamp": "2026-04-28T17:52:35Z"
+    },
+    {
+      "filename": "07_mobile_hero.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 390,
+      "viewport_height": 844,
+      "scroll_target": "top",
+      "actual_section_captured": "Mobile nav (kombo / Play / Progress) + hero card with H1 wrapped over four lines ('The math / RPG where / you build a / kingdom'), subhead wraps over four lines, three CTA buttons wrap to two rows ('Start playing' + 'I'm a parent' on row 1, 'I'm a teacher' on row 2), 'No sign-up required'. Below fold: FOR KIDS eyebrow + heading.",
+      "purpose": "Mobile headline wrapping, CTA, navigation, readability",
+      "capture_method": "browser_resize(390,844) -> scrollTo(0,0)",
+      "timestamp": "2026-04-28T17:52:48Z"
+    },
+    {
+      "filename": "08_mobile_audience_sections.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 390,
+      "viewport_height": 844,
+      "scroll_target": "FOR KIDS eyebrow",
+      "actual_section_captured": "All three audience cards stacked vertically: FOR KIDS / Not a test - an adventure / paragraph; FOR PARENTS / Math practice without the nagging / paragraph / Join the parent waitlist ->; FOR TEACHERS / Zero prep, full visibility / paragraph (CTA link below the fold).",
+      "purpose": "Mobile vertical stacking of audience cards",
+      "capture_method": "scrollTo(0, eyebrowY-60), scrollY=699, maxScroll=1699",
+      "timestamp": "2026-04-28T17:53:00Z"
+    },
+    {
+      "filename": "09_mobile_comparison_table.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 390,
+      "viewport_height": 844,
+      "scroll_target": "WHY KOMBO eyebrow (clamped to maxScroll)",
+      "actual_section_captured": "Top half: tail of HOW IT WORKS step cards (Practice math, Earn Sparks, Build kingdom, Want more). Bottom half: WHY KOMBO eyebrow + full comparison table (4 rows x 3 columns: row labels Scope/Core skill/Complexity/Philosophy; columns kombo and Prodigy with text wrapping).",
+      "purpose": "Mobile table behavior, possible overflow, OCR stress",
+      "capture_method": "scrollTo target=2058 clamped to maxScroll=1699; full table visible with cell text wrapping over multiple lines.",
+      "timestamp": "2026-04-28T17:53:13Z"
+    },
+    {
+      "filename": "10_small_mobile_stress.png",
+      "url": "https://kombo-41e.pages.dev/",
+      "viewport_width": 320,
+      "viewport_height": 568,
+      "scroll_target": "top",
+      "actual_section_captured": "Top nav (kombo logo, Play, Progress) + start of hero card. READY TO PLAY eyebrow visible. H1 wraps over five lines ('The math / RPG / where you / build a / kingdom'). Subhead clipped at bottom edge ('Practice multiplication and / division, earn sparks, and / grow your kingdom -- one / kombo at a time.'). CTAs not visible (below fold).",
+      "purpose": "Small mobile stress test, clipping, CTA readability, layout robustness",
+      "capture_method": "browser_resize(320,568) -> scrollTo(0,0); CTAs clipped below fold by design",
+      "timestamp": "2026-04-28T17:53:27Z"
+    }
+  ]
+}
