@@ -1,9 +1,12 @@
 import base64
+import hashlib
 import io
 import json
+import logging
 import mimetypes
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,7 +16,7 @@ from PIL import Image
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 VLM_MODEL = os.environ.get("VLM_MODEL", "minicpm-v")
-VLM_TIMEOUT = float(os.environ.get("VLM_TIMEOUT", "120"))
+VLM_TIMEOUT = float(os.environ.get("VLM_TIMEOUT", "180"))
 VLM_TEMPERATURE = float(os.environ.get("VLM_TEMPERATURE", "0.1"))
 VLM_NUM_PREDICT = int(os.environ.get("VLM_NUM_PREDICT", "8192"))
 VLM_NUM_CTX = int(os.environ.get("VLM_NUM_CTX", "32768"))
@@ -32,6 +35,37 @@ VLM_NUM_KEEP = int(os.environ.get("VLM_NUM_KEEP", "0"))
 MOCK_MODE = os.environ.get("VISION_MOCK", "1") == "1"
 UPSCALE_BELOW_WIDTH = int(os.environ.get("VISION_UPSCALE_BELOW_WIDTH", "400"))
 UPSCALE_FACTOR = int(os.environ.get("VISION_UPSCALE_FACTOR", "2"))
+MAX_IMAGE_DIMENSION = int(os.environ.get("VISION_MAX_IMAGE_DIMENSION", "0"))
+
+# -- Structured logging (GRACE V-M-* evidence surface) -------------------------
+# Default WARNING so existing operators see no behavior change. Set VLM_LOG_LEVEL=INFO
+# or DEBUG to surface BLOCK markers required by docs/verification-plan.xml VF-002,
+# VF-003, V-M-OLLAMA scenarios. Logger writes to stderr by default to keep stdout
+# clean for MCP stdio transport.
+VLM_LOG_LEVEL = os.environ.get("VLM_LOG_LEVEL", "WARNING").upper()
+_logger = logging.getLogger("vision_sidecar")
+if not _logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(message)s"))
+    _logger.addHandler(_h)
+_logger.setLevel(getattr(logging, VLM_LOG_LEVEL, logging.WARNING))
+
+
+def log_call(module: str, fn: str, block: str, level: int = logging.INFO, **fields) -> None:
+    """Emit a structured log entry tagged with a GRACE semantic block marker.
+
+    Format: ``[VisionSidecar][module][fn][BLOCK_NAME] k1=v1 k2=v2``.
+    Required redaction: callers MUST NOT pass raw base64 image bytes, full Ollama
+    response bodies, or env-var values. Pass ``image_sha256``, ``image_size_bytes``,
+    ``response_chars`` etc. instead.
+    """
+    if not _logger.isEnabledFor(level):
+        return
+    if fields:
+        kv = " ".join(f"{k}={v}" for k, v in fields.items())
+        _logger.log(level, f"[VisionSidecar][{module}][{fn}][{block}] {kv}")
+    else:
+        _logger.log(level, f"[VisionSidecar][{module}][{fn}][{block}]")
 
 # qwen3-vl and other reasoning VLMs unconditionally emit <think>...</think>
 # tokens before the actual response, consuming the entire num_predict budget on
@@ -246,57 +280,80 @@ MOCK_STRUCTURED_JSON = {
 def _validate_image(path: str) -> dict:
     p = Path(path)
     if not p.exists():
+        log_call("image", "_validate_image", "BLOCK_VALIDATE_IMAGE", level=logging.ERROR, path=str(p), result="not_found")
         raise FileNotFoundError(f"Image not found: {path}")
-    if p.stat().st_size > 50 * 1024 * 1024:
-        raise ValueError(f"Image too large: {p.stat().st_size / 1024 / 1024:.1f}MB (max 50MB)")
+    size = p.stat().st_size
+    if size > 50 * 1024 * 1024:
+        log_call("image", "_validate_image", "BLOCK_VALIDATE_IMAGE", level=logging.ERROR, path=str(p), size_bytes=size, result="too_large")
+        raise ValueError(f"Image too large: {size / 1024 / 1024:.1f}MB (max 50MB)")
 
     mime, _ = mimetypes.guess_type(str(p))
     if not mime or not mime.startswith("image/"):
         mime = "image/png"
 
+    log_call("image", "_validate_image", "BLOCK_VALIDATE_IMAGE", path=str(p), size_bytes=size, mime=mime)
     return {
         "path": str(p),
-        "size_bytes": p.stat().st_size,
-        "size_mb": round(p.stat().st_size / 1024 / 1024, 2),
+        "size_bytes": size,
+        "size_mb": round(size / 1024 / 1024, 2),
         "mime": mime,
         "modified": datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat(),
     }
 
 
-def _maybe_upscale(image_bytes: bytes, mime: str) -> tuple[bytes, dict]:
-    """Upscale narrow screenshots so the VLM gets more pixels per glyph.
+def _preprocess_image(image_bytes: bytes, mime: str) -> tuple[bytes, dict]:
+    """Upscale narrow screenshots and/or downscale oversized images.
 
-    Triggered when the image width is at or below UPSCALE_BELOW_WIDTH (default 400px).
-    Returns (possibly-rewritten bytes, info dict). Recommendation §9 of the kombo eval:
-    the 320×568 stress screenshot was the dataset's worst case, and the model needs
-    more pixels per character at that size to read tight mobile text.
+    Upscale: triggered when image width ≤ UPSCALE_BELOW_WIDTH (default 400px).
+    Recommendation §9 of the kombo eval: the 320×568 stress screenshot was the
+    dataset's worst case, and the model needs more pixels per character at that
+    size to read tight mobile text.
+
+    Downscale: triggered when MAX_IMAGE_DIMENSION > 0 and the longest side of
+    the image (after any upscaling) exceeds that limit. Capping prevents VLM
+    timeouts on very large images — most VLMs process efficiently below ~1920px.
     """
     try:
         with Image.open(io.BytesIO(image_bytes)) as im:
-            w, h = im.size
-            info = {"original_size": [w, h], "upscaled": False}
-            if w <= UPSCALE_BELOW_WIDTH and UPSCALE_FACTOR > 1:
-                new_w, new_h = w * UPSCALE_FACTOR, h * UPSCALE_FACTOR
-                resized = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            orig_w, orig_h = im.size
+            info: dict = {"original_size": [orig_w, orig_h]}
+            target_w, target_h = orig_w, orig_h
+
+            if orig_w <= UPSCALE_BELOW_WIDTH and UPSCALE_FACTOR > 1:
+                target_w = orig_w * UPSCALE_FACTOR
+                target_h = orig_h * UPSCALE_FACTOR
+                info["upscaled"] = True
+                info["upscale_factor"] = UPSCALE_FACTOR
+                log_call(
+                    "image", "_preprocess_image", "BLOCK_UPSCALE",
+                    from_w=orig_w, from_h=orig_h, to_w=target_w, to_h=target_h,
+                    factor=UPSCALE_FACTOR, method="Lanczos",
+                )
+
+            if MAX_IMAGE_DIMENSION > 0 and max(target_w, target_h) > MAX_IMAGE_DIMENSION:
+                scale = MAX_IMAGE_DIMENSION / max(target_w, target_h)
+                target_w = max(1, int(target_w * scale))
+                target_h = max(1, int(target_h * scale))
+                info["downscaled"] = True
+                info["downscale_target"] = [target_w, target_h]
+
+            if (target_w, target_h) != (orig_w, orig_h):
+                resized = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
                 buf = io.BytesIO()
-                # Match input format where possible. PIL needs a known format.
                 fmt = "PNG"
                 if mime == "image/jpeg":
                     fmt = "JPEG"
                     if resized.mode == "RGBA":
                         resized = resized.convert("RGB")
                 resized.save(buf, format=fmt)
-                info.update({
-                    "upscaled": True,
-                    "factor": UPSCALE_FACTOR,
-                    "new_size": [new_w, new_h],
-                    "method": "Lanczos",
-                })
+                info["final_size"] = [target_w, target_h]
+                info["method"] = "Lanczos"
                 return buf.getvalue(), info
+
             return image_bytes, info
     except Exception as e:
-        # Don't fail the whole call over a preprocessing issue.
-        return image_bytes, {"upscaled": False, "error": f"upscale-skipped: {e}"}
+        log_call("image", "_preprocess_image", "BLOCK_UPSCALE", level=logging.WARNING, error=str(e), result="skipped")
+        return image_bytes, {"preprocess_skipped": True, "error": str(e)}
 
 
 def _encode_image(path: str) -> tuple[str, str, dict]:
@@ -308,8 +365,15 @@ def _encode_image(path: str) -> tuple[str, str, dict]:
     with open(p, "rb") as f:
         raw = f.read()
 
-    processed, preprocess_info = _maybe_upscale(raw, mime)
+    processed, preprocess_info = _preprocess_image(raw, mime)
     b64 = base64.b64encode(processed).decode("utf-8")
+    # Hash the processed bytes (post-upscale) for traceability — never log raw bytes.
+    sha = hashlib.sha256(processed).hexdigest()[:16]
+    log_call(
+        "image", "_encode_image", "BLOCK_ENCODE_IMAGE",
+        image_sha256=sha, raw_bytes=len(raw), processed_bytes=len(processed),
+        b64_chars=len(b64),
+    )
     return b64, mime, preprocess_info
 
 
@@ -370,17 +434,64 @@ def _call_ollama(
         # Ollama supports asking the model to constrain itself to JSON output.
         payload["format"] = "json"
 
-    with httpx.Client(timeout=VLM_TIMEOUT) as client:
-        resp = client.post(f"{OLLAMA_URL}/api/chat", json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-
-    return data.get("message", {}).get("content", "")
+    log_call(
+        "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA",
+        phase="entry", model=VLM_MODEL, num_predict=num_predict, num_ctx=VLM_NUM_CTX,
+        prompt_chars=len(prompt), suppress_thinking=int(bool(suppress_thinking)),
+        response_json=int(bool(response_json)),
+    )
+    _t0 = time.perf_counter()
+    try:
+        with httpx.Client(timeout=VLM_TIMEOUT) as client:
+            resp = client.post(f"{OLLAMA_URL}/api/chat", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+        content = data.get("message", {}).get("content", "")
+        log_call(
+            "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA",
+            phase="exit", response_chars=len(content),
+            wall_seconds=round(time.perf_counter() - _t0, 2),
+            status="ok",
+        )
+        return content
+    except httpx.TimeoutException:
+        log_call(
+            "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA", level=logging.WARNING,
+            phase="exit", wall_seconds=round(time.perf_counter() - _t0, 2),
+            status="timeout", timeout_seconds=VLM_TIMEOUT,
+        )
+        return (
+            f"[VLM_TIMEOUT] Ollama did not respond within {VLM_TIMEOUT}s. "
+            "The image may be too large or the model too slow. "
+            "Try increasing VLM_TIMEOUT or setting VISION_MAX_IMAGE_DIMENSION "
+            "(e.g. 1920) to cap the longest side."
+        )
+    except httpx.ConnectError:
+        log_call(
+            "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA", level=logging.ERROR,
+            phase="exit", wall_seconds=round(time.perf_counter() - _t0, 2),
+            status="connect_error", url=OLLAMA_URL,
+        )
+        return (
+            f"[VLM_CONNECT_ERROR] Cannot reach Ollama at {OLLAMA_URL}. "
+            "Is the Ollama server running?"
+        )
+    except httpx.HTTPStatusError as exc:
+        log_call(
+            "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA", level=logging.ERROR,
+            phase="exit", wall_seconds=round(time.perf_counter() - _t0, 2),
+            status="http_error", http_status=exc.response.status_code,
+        )
+        return (
+            f"[VLM_HTTP_ERROR] Ollama returned HTTP {exc.response.status_code}: "
+            f"{exc.response.text[:300]}"
+        )
 
 
 def _try_parse_json(raw: str) -> tuple[object | None, str | None]:
     """Best-effort JSON parse. Strips ```json fences if present. Returns (obj, error)."""
     if not raw:
+        log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", level=logging.WARNING, result="empty_response")
         return None, "empty response"
     s = raw.strip()
     # Strip a single fenced code block if the model wrapped its output.
@@ -388,16 +499,21 @@ def _try_parse_json(raw: str) -> tuple[object | None, str | None]:
     if fence:
         s = fence.group(1).strip()
     try:
-        return json.loads(s), None
+        obj = json.loads(s)
+        log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", result="ok", path="direct")
+        return obj, None
     except json.JSONDecodeError as e:
         # Last-ditch: find the first { and last } and try the slice.
         start = s.find("{")
         end = s.rfind("}")
         if start != -1 and end > start:
             try:
-                return json.loads(s[start:end + 1]), None
+                obj = json.loads(s[start:end + 1])
+                log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", result="ok", path="brace_fallback")
+                return obj, None
             except json.JSONDecodeError:
                 pass
+        log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", level=logging.WARNING, result="parse_error", err=str(e)[:80])
         return None, f"json parse error: {e}"
 
 
@@ -438,6 +554,7 @@ def analyze_image(
         JSON string with keys: image (metadata), model, preprocess (upscale info),
         analysis (model output).
     """
+    log_call("tools", "analyze_image", "BLOCK_DISPATCH_TOOL", tool_name="analyze_image", viewport_hint=viewport_hint, has_user_prompt=int(prompt is not None))
     meta = _validate_image(image_path)
 
     if MOCK_MODE:
@@ -477,6 +594,7 @@ def analyze_ui_screenshot(image_path: str, viewport_hint: str | None = None) -> 
         image_path: Absolute path to the UI screenshot.
         viewport_hint: Optional viewport class ("desktop"/"tablet"/"mobile"/"small_mobile").
     """
+    log_call("tools", "analyze_ui_screenshot", "BLOCK_DISPATCH_TOOL", tool_name="analyze_ui_screenshot", viewport_hint=viewport_hint)
     meta = _validate_image(image_path)
 
     if MOCK_MODE:
@@ -521,6 +639,7 @@ def extract_text_from_image(image_path: str) -> str:
     Args:
         image_path: Absolute path to the image.
     """
+    log_call("tools", "extract_text_from_image", "BLOCK_DISPATCH_TOOL", tool_name="extract_text_from_image")
     meta = _validate_image(image_path)
 
     if MOCK_MODE:
@@ -569,6 +688,7 @@ def extract_table(image_path: str) -> str:
         JSON string with keys: image, model, preprocess, table (parsed JSON if
         the model emitted valid JSON, else raw text + parse_error).
     """
+    log_call("tools", "extract_table", "BLOCK_DISPATCH_TOOL", tool_name="extract_table")
     meta = _validate_image(image_path)
 
     if MOCK_MODE:
@@ -635,6 +755,7 @@ def analyze_structured(image_path: str, viewport_hint: str | None = None) -> str
         JSON string. The `result` key is the parsed structured output if the model
         emitted valid JSON; otherwise raw text + parse_error.
     """
+    log_call("tools", "analyze_structured", "BLOCK_DISPATCH_TOOL", tool_name="analyze_structured", viewport_hint=viewport_hint)
     meta = _validate_image(image_path)
 
     if MOCK_MODE:
@@ -689,6 +810,7 @@ def check_vlm_status() -> str:
         "vlm_prefill_thinking_close": VLM_PREFILL_THINKING_CLOSE,
         "upscale_below_width_px": UPSCALE_BELOW_WIDTH,
         "upscale_factor": UPSCALE_FACTOR,
+        "max_image_dimension_px": MAX_IMAGE_DIMENSION,
     }
 
     if MOCK_MODE:
@@ -699,6 +821,7 @@ def check_vlm_status() -> str:
             "note": "Set VISION_MOCK=0 to use real VLM",
         }, indent=2)
 
+    log_call("status", "check_vlm_status", "BLOCK_PROBE_OLLAMA", phase="entry", url=OLLAMA_URL)
     try:
         with httpx.Client(timeout=10) as client:
             resp = client.get(f"{OLLAMA_URL}/api/tags")
@@ -707,6 +830,11 @@ def check_vlm_status() -> str:
 
         model_names = [m.get("name", "") for m in models]
         vlm_available = any(VLM_MODEL in name for name in model_names)
+        log_call(
+            "status", "check_vlm_status", "BLOCK_PROBE_OLLAMA",
+            phase="exit", status="ready" if vlm_available else "model_not_found",
+            model_count=len(model_names), vlm_available=int(vlm_available),
+        )
 
         return json.dumps({
             **config_block,
@@ -715,6 +843,7 @@ def check_vlm_status() -> str:
             "status": "ready" if vlm_available else "model_not_found",
         }, indent=2)
     except httpx.ConnectError:
+        log_call("status", "check_vlm_status", "BLOCK_PROBE_OLLAMA", level=logging.WARNING, phase="exit", status="connection_failed")
         return json.dumps({
             **config_block,
             "status": "connection_failed",
