@@ -32,3 +32,13 @@ run_tuned_eval_sequential.py
 # Allow committing kombo eval dataset (kombo is a public site)
 !eval_images/**/*.png
 !eval_results/**/*.png
+
+# GRACE framework artifacts — local engineering protocol, not part of public product
+AGENTS.md
+docs/
+.grace/
+
+# Agent harness (Claude Code session data, plans, transcripts)
+.claude/
+CLAUDE.md
+.claude.local.md
