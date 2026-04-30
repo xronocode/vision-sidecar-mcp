@@ -274,6 +274,52 @@ MOCK_STRUCTURED_JSON = {
     "_mock": True,
 }
 
+# v0.3.0: diagnose_error reuses the global SYSTEM_PROMPT (extraction-focused)
+# and adds a tool-specific user-prompt block. The ui_diff multi-image gate
+# (eval_results/smoke_multi_image/result.md) failed, so a per-tool system
+# prompt dispatcher is deferred to v0.4.0+.
+DIAGNOSE_ERROR_PROMPT = """Analyze this screenshot which shows an error state, broken layout, or unexpected behavior.
+
+Return a single JSON object (no markdown fences, no surrounding prose) matching this schema:
+
+{
+  "error_type": "layout_break" | "missing_element" | "overflow" | "clipping" | "wrong_content" | "error_message" | "crash" | "404" | "console_error" | "validation_error" | "z_index" | "other",
+  "description": string (specific: which elements are affected, how they differ from expected),
+  "affected_elements": [
+    {"label": string, "location": "top-left|top|top-right|center-left|center|center-right|bottom-left|bottom|bottom-right"}
+  ],
+  "visible_error_text": string | null (transcribed exactly if any error message/code is in the image, else null),
+  "suggested_fixes": [string]  (2-3 concrete actionable suggestions, reference CSS properties / HTML structure / responsive breakpoints when applicable),
+  "looks_correct": boolean (true ONLY if no error is visible — see rule below),
+  "confidence": {"overall": float, "diagnosis": float}
+}
+
+Rules:
+- If you cannot identify a clear error in the screenshot, set looks_correct=true and emit a minimal payload with error_type="other", empty affected_elements, empty suggested_fixes.
+- Do NOT invent error messages that are not visible.
+- Do NOT speculate about errors outside the visible viewport (those are clipping concerns, not errors).
+- Do NOT critique design choices ("color is too bright") — only report functional errors.
+- Color descriptors stay qualitative (no hex)."""
+
+MOCK_DIAGNOSIS = {
+    "error_type": "clipping",
+    "description": "Hero CTA buttons ('Start playing', 'I'm a parent', 'I'm a teacher') are not visible in the viewport — only the eyebrow, headline, and a partial subhead fit before the bottom edge.",
+    "affected_elements": [
+        {"label": "Start playing button", "location": "bottom"},
+        {"label": "I'm a parent button", "location": "bottom"},
+        {"label": "I'm a teacher button", "location": "bottom"},
+    ],
+    "visible_error_text": None,
+    "suggested_fixes": [
+        "Reduce hero heading font-size at @media (max-width: 360px) so the H1 wraps to fewer lines.",
+        "Add a sticky CTA bar at the bottom of the viewport on small mobile viewports.",
+        "Tighten hero card vertical padding when viewport height < 600px.",
+    ],
+    "looks_correct": False,
+    "confidence": {"overall": 0.92, "diagnosis": 0.88},
+    "_mock": True,
+}
+
 
 # -- Helpers -------------------------------------------------------------------
 
@@ -776,6 +822,88 @@ def analyze_structured(image_path: str, viewport_hint: str | None = None) -> str
         "model": VLM_MODEL,
         "preprocess": preprocess,
         "viewport_hint": viewport_hint,
+    }
+    if parsed is not None:
+        body["result"] = parsed
+    else:
+        body["result"] = None
+        body["raw"] = raw
+        body["parse_error"] = parse_error
+
+    return json.dumps(body, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def diagnose_error(
+    image_path: str,
+    error_context: str | None = None,
+    viewport_hint: str | None = None,
+) -> str:
+    """Analyze a screenshot showing an error and propose actionable fixes.
+
+    Use this when a screenshot contains a visible error state: broken layout,
+    error message, console output, crash screen, 404 page, missing element,
+    overflow, clipping, validation error, or any UI that does not match
+    expected behavior. The model identifies the error, describes what is wrong,
+    and suggests concrete fixes.
+
+    Returns the same JSON-payload envelope as `analyze_structured` —
+    `result` holds the parsed JSON if the model emitted valid JSON, else
+    `raw` + `parse_error`.
+
+    Args:
+        image_path: Absolute path to the screenshot showing the error.
+        error_context: Optional text from console/terminal/log that provides
+            additional context (stack trace, error message). When provided,
+            it is included in the user prompt and the model is asked to
+            cross-reference it with what is visible.
+        viewport_hint: Optional viewport class for responsive-specific analysis.
+
+    Returns:
+        JSON string with keys: image, model, preprocess, viewport_hint,
+        error_context, result (parsed diagnosis JSON) OR raw + parse_error.
+    """
+    log_call(
+        "tools", "diagnose_error", "BLOCK_DISPATCH_TOOL",
+        tool_name="diagnose_error", viewport_hint=viewport_hint,
+        has_error_context=int(error_context is not None),
+    )
+    meta = _validate_image(image_path)
+
+    if MOCK_MODE:
+        return json.dumps({
+            "image": meta,
+            "model": f"{VLM_MODEL} (MOCK)",
+            "viewport_hint": viewport_hint,
+            "error_context": error_context,
+            "result": MOCK_DIAGNOSIS,
+        }, ensure_ascii=False, indent=2)
+
+    image_b64, _, preprocess = _encode_image(image_path)
+
+    context_block = ""
+    if error_context:
+        context_block = (
+            "\n\nERROR CONTEXT FROM CONSOLE/LOG:\n```\n"
+            + error_context
+            + "\n```\nCross-reference this with what you see in the screenshot.\n"
+        )
+
+    user_prompt = (
+        _viewport_hint_block(viewport_hint)
+        + DIAGNOSE_ERROR_PROMPT
+        + context_block
+    )
+
+    raw = _call_ollama(image_b64, user_prompt, response_json=True)
+    parsed, parse_error = _try_parse_json(raw)
+
+    body: dict = {
+        "image": meta,
+        "model": VLM_MODEL,
+        "preprocess": preprocess,
+        "viewport_hint": viewport_hint,
+        "error_context": error_context,
     }
     if parsed is not None:
         body["result"] = parsed
