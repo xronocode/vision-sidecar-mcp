@@ -915,14 +915,55 @@ def diagnose_error(
     return json.dumps(body, ensure_ascii=False, indent=2)
 
 
+def _resolve_server_version() -> str:
+    """Resolve the running source version.
+
+    Priority:
+      1. pyproject.toml (project root, sibling of vision_sidecar/) — reflects the
+         CURRENT checkout, not a stale install. Most accurate during development.
+      2. importlib.metadata for "vision-sidecar-mcp" — used when running from a
+         wheel/sdist install with no source pyproject available.
+      3. "unknown" fallback.
+    """
+    try:
+        import tomllib
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        ver = data.get("project", {}).get("version")
+        if ver:
+            return ver
+    except Exception:
+        pass
+    try:
+        from importlib.metadata import version as _pkg_version
+        return _pkg_version("vision-sidecar-mcp")
+    except Exception:
+        return "unknown"
+
+
+SERVER_VERSION = _resolve_server_version()
+TOOLS_AVAILABLE = [
+    "analyze_image",
+    "analyze_ui_screenshot",
+    "extract_text_from_image",
+    "extract_table",
+    "analyze_structured",
+    "diagnose_error",
+    "check_vlm_status",
+]
+
+
 @mcp.tool()
 def check_vlm_status() -> str:
     """Check if the VLM is available and responsive.
 
-    Returns server config (URL, model, temperature, num_predict, upscale threshold)
-    plus the list of models the Ollama backend reports.
+    Returns server config (version, URL, model, sampling profile, upscale threshold,
+    tools_available list) plus the list of models the Ollama backend reports.
     """
     config_block = {
+        "version": SERVER_VERSION,
+        "tools_available": TOOLS_AVAILABLE,
         "ollama_url": OLLAMA_URL,
         "vlm_model": VLM_MODEL,
         "vlm_temperature": VLM_TEMPERATURE,

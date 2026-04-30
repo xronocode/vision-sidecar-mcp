@@ -84,6 +84,45 @@ def test_check_vlm_status_emits_or_skips_probe(captured_logs):
     assert "BLOCK_PROBE_OLLAMA" not in logs
 
 
+def test_check_vlm_status_exposes_version_and_tools():
+    """V-M-STATUS: response must surface version and full tools_available list."""
+    out = server.check_vlm_status()
+    parsed = json.loads(out)
+    # Version is non-empty (real release version OR "unknown" if unresolvable, but never missing)
+    assert "version" in parsed
+    assert isinstance(parsed["version"], str)
+    assert len(parsed["version"]) > 0
+
+    # Full tool inventory present
+    assert "tools_available" in parsed
+    expected_tools = {
+        "analyze_image",
+        "analyze_ui_screenshot",
+        "extract_text_from_image",
+        "extract_table",
+        "analyze_structured",
+        "diagnose_error",
+        "check_vlm_status",
+    }
+    assert set(parsed["tools_available"]) == expected_tools
+
+
+def test_check_vlm_status_tools_available_matches_actual_decorations():
+    """Catch drift: tools_available list must enumerate every actual @mcp.tool callable."""
+    actual = {
+        name for name in dir(server)
+        if not name.startswith("_") and callable(getattr(server, name))
+        and hasattr(getattr(server, name), "__doc__")
+        and getattr(server, name).__module__ == server.__name__
+    }
+    # Filter to tools (functions defined in server.py with mcp tool docstring style)
+    declared = set(server.TOOLS_AVAILABLE)
+    # Every declared tool must exist as a callable on the module
+    for tool in declared:
+        assert hasattr(server, tool), f"declared tool '{tool}' missing from module"
+        assert callable(getattr(server, tool))
+
+
 def test_mock_analyze_structured_returns_valid_json(kombo_image):
     """Schema compliance smoke: mock fixture parses cleanly via _try_parse_json."""
     out = server.analyze_structured(image_path=str(kombo_image))
