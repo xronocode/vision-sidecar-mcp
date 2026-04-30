@@ -1,0 +1,40 @@
+{
+  "pair_id": 2,
+  "label": "extreme_break",
+  "mode": "with_prefill",
+  "before": "01_desktop_hero.png",
+  "after": "10_small_mobile_stress.png",
+  "expected_detection": [
+    "same hero, drastically narrower viewport",
+    "h1 wraps to 5 lines",
+    "ctas below the fold (clipped)",
+    "subhead truncated"
+  ],
+  "ok": true,
+  "wall_seconds": 4.97,
+  "response_chars": 2160,
+  "response": "### 1. CHANGES  \n- **Text wrap in the main headline**: In IMAGE 1, the headline *\"The math RPG where you build a kingdom\"* wraps across multiple lines (with \"where\" on the second line). In IMAGE 2, the headline is fully visible without wrapping (all text on one line).  \n- **Position of the purple oval**: In IMAGE 1, the purple oval is positioned to the right of the headline, with space between the text and the oval. In IMAGE 2, the purple oval is partially cropped off the right edge of the viewport (no visible space between text and oval).  \n- **\"I’m a parent\" and \"I’m a teacher\" buttons**: In IMAGE 1, these buttons are fully visible below the \"Start playing\" button. In IMAGE 2, these buttons are clipped at the bottom edge (only the top portion of the buttons is visible).  \n- **\"FOR KIDS\" section**: In IMAGE 1, the \"FOR KIDS\" section (with text *\"Not a test — an adventure\"*) is fully visible. In IMAGE 2, this section is entirely cut off at the bottom edge (no visible text below the main headline).  \n- **\"FOR PARENTS\" section**: In IMAGE 1, the \"FOR PARENTS\" section (with text *\"Math practice without the nagging\"*) is fully visible. In IMAGE 2, this section is entirely cut off at the bottom edge (no visible text below the main headline).  \n\n### 2. UNCHANGED  \n- **Top navigation bar**: The \"kombo\" logo, \"Play\" and \"Progress\" buttons remain identical in both images.  \n- **\"READY TO PLAY\" header**: The purple \"READY TO PLAY\" text is fully visible and positioned identically in both images.  \n- **Main headline text**: The phrase *\"The math RPG where you build a kingdom\"* is identical in both images (though its wrapping differs).  \n- **Subheading text**: The phrase *\"Practice multiplication and division, earn sparks, and grow your kingdom — one kombo at a time.\"* is identical in both images (though its wrapping differs).  \n\n### 3. CLIPPING  \n- **IMAGE 1**: No content is clipped at the bottom edge (all CTAs and sections are fully visible).  \n- **IMAGE 2**: Content is clipped at the bottom edge (the \"FOR KIDS\" and \"FOR PARENTS\" sections are entirely cut off, and the \"I’m a parent\" and \"I’m a teacher\" buttons are partially cut off).",
+  "messages_array_shape": [
+    {
+      "role": "user",
+      "content_chars": 704,
+      "image_count": 2
+    },
+    {
+      "role": "assistant",
+      "content_chars": 10,
+      "image_count": 0
+    }
+  ],
+  "options": {
+    "temperature": 0.1,
+    "num_predict": 8192,
+    "num_ctx": 32768,
+    "top_p": 0.9,
+    "top_k": 20,
+    "repeat_penalty": 1.05,
+    "num_batch": 1024,
+    "num_keep": 0,
+    "seed": 42
+  }
+}

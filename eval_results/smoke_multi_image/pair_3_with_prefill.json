@@ -1,0 +1,39 @@
+{
+  "pair_id": 3,
+  "label": "stack_responsive",
+  "mode": "with_prefill",
+  "before": "02_desktop_audience_sections.png",
+  "after": "08_mobile_audience_sections.png",
+  "expected_detection": [
+    "same three audience cards stacked",
+    "teacher waitlist link visible in desktop, clipped on mobile",
+    "how it works step grid present in desktop, absent in mobile"
+  ],
+  "ok": true,
+  "wall_seconds": 5.85,
+  "response_chars": 2369,
+  "response": "### 1. CHANGES  \n- **Text wrap in \"FOR KIDS\" section**: In IMAGE 1, the paragraph under \"Not a test — an adventure\" wraps to three lines (\"Solve math problems to earn sparks. Use sparks to build your kingdom. Each correct answer makes your world bigger.\"). In IMAGE 2, this paragraph wraps to two lines (\"Solve math problems to earn sparks. Use sparks to build your kingdom. Each correct answer makes your world bigger.\" — the line break after \"sparks.\" is removed, reducing line count).  \n- **Text wrap in \"FOR PARENTS\" section**: In IMAGE 1, the paragraph under \"Math practice without the nagging\" wraps to three lines (\"A parent dashboard is on the way. See progress, set goals, and stay informed — without turning into homework police.\"). In IMAGE 2, this paragraph wraps to two lines (\"A parent dashboard is on the way. See progress, set goals, and stay informed — without turning into homework police.\" — the line break after \"informed —\" is removed, reducing line count).  \n- **\"FOR TEACHERS\" section visibility**: In IMAGE 1, the \"Zero prep, full visibility\" section is fully visible. In IMAGE 2, the \"Zero prep, full visibility\" section is partially visible (the text \"Classroom tools are on the roadmap. Assign practice, track mastery, and spot who needs help — all from one dashboard.\" is cut off at the bottom edge).  \n- **\"HOW IT WORKS\" section**: In IMAGE 1, the \"HOW IT WORKS\" section is fully visible. In IMAGE 2, the \"HOW IT WORKS\" section is partially visible (the text \"HOW IT WORKS\" is cut off at the top edge).  \n\n### 2. UNCHANGED  \n- **Headings and labels**: \"FOR KIDS\", \"FOR PARENTS\", \"FOR TEACHERS\", and \"HOW IT WORKS\" labels remain identical in both images.  \n- **CTAs**: \"Join the parent waitlist →\" and \"Join the teacher waitlist →\" are fully visible and identical in both images.  \n- **\"Build kingdom\" and \"Want more\" cards**: The text and layout of these cards (e.g., \"Build kingdom: Grow your world with sparks\") are identical in both images.  \n\n### 3. CLIPPING  \n- **IMAGE 1**: No content is clipped at the bottom edge; all sections (including \"FOR TEACHERS\" and \"HOW IT WORKS\") are fully visible.  \n- **IMAGE 2**: Content is clipped at the bottom edge: the \"FOR TEACHERS\" section (specifically the paragraph under \"Zero prep, full visibility\") and the \"HOW IT WORKS\" section (specifically the \"HOW IT WORKS\" label) are partially cut off.",
+  "messages_array_shape": [
+    {
+      "role": "user",
+      "content_chars": 704,
+      "image_count": 2
+    },
+    {
+      "role": "assistant",
+      "content_chars": 10,
+      "image_count": 0
+    }
+  ],
+  "options": {
+    "temperature": 0.1,
+    "num_predict": 8192,
+    "num_ctx": 32768,
+    "top_p": 0.9,
+    "top_k": 20,
+    "repeat_penalty": 1.05,
+    "num_batch": 1024,
+    "num_keep": 0,
+    "seed": 42
+  }
+}

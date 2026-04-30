@@ -1,0 +1,40 @@
+{
+  "pair_id": 1,
+  "label": "responsive_break",
+  "mode": "with_prefill",
+  "before": "01_desktop_hero.png",
+  "after": "07_mobile_hero.png",
+  "expected_detection": [
+    "same hero content",
+    "h1 wraps to multiple lines on mobile (4 lines)",
+    "egg illustration removed on mobile",
+    "ctas reflow to 2 rows on mobile"
+  ],
+  "ok": true,
+  "wall_seconds": 5.34,
+  "response_chars": 2102,
+  "response": "### 1. CHANGES  \n- **Text wrap in the description paragraph**: In IMAGE 1, the description text *\"Practice multiplication and division, earn sparks, and grow your kingdom — one kombo at a time.\"* wraps across multiple lines with visible line breaks. In IMAGE 2, this text is condensed into fewer lines with tighter wrapping (no visible line breaks).  \n- **Position of the \"I’m a teacher\" button**: In IMAGE 1, the \"I’m a teacher\" button sits directly below the \"I’m a parent\" button. In IMAGE 2, the \"I’m a teacher\" button is positioned *below* the \"I’m a parent\" button but shifted slightly downward, creating a more compact vertical stack.  \n- **Visibility of the purple oval**: In IMAGE 1, the purple oval (right of the main headline) is fully visible. In IMAGE 2, the purple oval is partially clipped at the top edge (only the lower portion remains visible).  \n- **Text in the \"FOR KIDS\" section**: In IMAGE 1, the \"FOR KIDS\" section includes the full text *\"Not a test — an adventure\"* and the subsequent paragraph. In IMAGE 2, the \"FOR KIDS\" section is truncated at the bottom edge (the paragraph *\"Solve math problems to earn sparks...\"* is cut off).  \n\n### 2. UNCHANGED  \n- **Header elements**: The \"kombo\" logo (top-left), \"Play\" and \"Progress\" buttons (top-right), and \"READY TO PLAY\" subheading remain identical in both images.  \n- **\"Start playing\" button**: The purple \"Start playing\" button’s color, text, and position relative to the other buttons are unchanged.  \n- **\"No sign-up required\" text**: This text remains visible and unaltered in both images.  \n- **\"FOR PARENTS\" section header**: The \"FOR PARENTS\" header text is present in both images (though the full content below it is clipped in IMAGE 2).  \n\n### 3. CLIPPING  \n- **IMAGE 1**: No content is clipped at the bottom edge; all visible elements (including the \"FOR KIDS\" section) are fully displayed.  \n- **IMAGE 2**: The bottom edge of the page is clipped, showing partial text in the \"FOR KIDS\" section (the paragraph *\"Solve math problems to earn sparks...\"* is cut off) and the purple oval is partially clipped at the top.",
+  "messages_array_shape": [
+    {
+      "role": "user",
+      "content_chars": 704,
+      "image_count": 2
+    },
+    {
+      "role": "assistant",
+      "content_chars": 10,
+      "image_count": 0
+    }
+  ],
+  "options": {
+    "temperature": 0.1,
+    "num_predict": 8192,
+    "num_ctx": 32768,
+    "top_p": 0.9,
+    "top_k": 20,
+    "repeat_penalty": 1.05,
+    "num_batch": 1024,
+    "num_keep": 0,
+    "seed": 42
+  }
+}

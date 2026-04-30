@@ -1,0 +1,35 @@
+{
+  "pair_id": 2,
+  "label": "extreme_break",
+  "mode": "no_prefill",
+  "before": "01_desktop_hero.png",
+  "after": "10_small_mobile_stress.png",
+  "expected_detection": [
+    "same hero, drastically narrower viewport",
+    "h1 wraps to 5 lines",
+    "ctas below the fold (clipped)",
+    "subhead truncated"
+  ],
+  "ok": true,
+  "wall_seconds": 97.48,
+  "response_chars": 0,
+  "response": "",
+  "messages_array_shape": [
+    {
+      "role": "user",
+      "content_chars": 704,
+      "image_count": 2
+    }
+  ],
+  "options": {
+    "temperature": 0.1,
+    "num_predict": 8192,
+    "num_ctx": 32768,
+    "top_p": 0.9,
+    "top_k": 20,
+    "repeat_penalty": 1.05,
+    "num_batch": 1024,
+    "num_keep": 0,
+    "seed": 42
+  }
+}

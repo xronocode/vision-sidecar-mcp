@@ -1,0 +1,26 @@
+[
+  {
+    "pair_id": 1,
+    "label": "responsive_break",
+    "mode": "no_prefill",
+    "ok": true,
+    "wall_seconds": 95.93,
+    "response_chars": 0
+  },
+  {
+    "pair_id": 2,
+    "label": "extreme_break",
+    "mode": "no_prefill",
+    "ok": true,
+    "wall_seconds": 97.48,
+    "response_chars": 0
+  },
+  {
+    "pair_id": 3,
+    "label": "stack_responsive",
+    "mode": "no_prefill",
+    "ok": true,
+    "wall_seconds": 218.82,
+    "response_chars": 0
+  }
+]
