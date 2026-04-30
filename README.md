@@ -20,15 +20,20 @@ Designed for [Kilo Code](https://kilo.ai), but works with any MCP-compatible cli
 
 ## Features
 
-- **6 MCP tools**: `analyze_image`, `analyze_ui_screenshot`, `extract_text_from_image`, `extract_table`, `analyze_structured`, `check_vlm_status`
+- **7 MCP tools**: `analyze_image`, `analyze_ui_screenshot`, `extract_text_from_image`, `extract_table`, `analyze_structured`, `diagnose_error`, `check_vlm_status`
 - **Hardened extraction-only system prompt** — forbids hex-code invention, requires per-element color attribution, preserves icon glyphs (✦, →) verbatim, flags below-fold clipping
 - **`viewport_hint` parameter** (`desktop`/`tablet`/`mobile`/`small_mobile`) — viewport-aware analysis with explicit clipping checks for narrow viewports
 - **Auto-upscale** for narrow screenshots (≤400px wide) using Pillow Lanczos 2× — improves OCR on tight mobile layouts
 - **Structured JSON output** via `analyze_structured` — schema with `glyphs_and_icons`, `below_fold_or_clipped`, per-block color descriptors, and a fenced `interpretation` block
+- **Error / broken-UI diagnosis** via `diagnose_error` — returns structured JSON with `error_type`, `affected_elements`, `suggested_fixes`; optional `error_context` for cross-referencing console/log output
+- **Structured logging** with 7 GRACE BLOCK markers (`BLOCK_VALIDATE_IMAGE`, `BLOCK_UPSCALE`, `BLOCK_ENCODE_IMAGE`, `BLOCK_CALL_OLLAMA`, `BLOCK_PARSE_JSON`, `BLOCK_PROBE_OLLAMA`, `BLOCK_DISPATCH_TOOL`) — opt-in via `VLM_LOG_LEVEL=INFO`
+- **44 module-level tests** in `tests/` (no Ollama required) — `pytest tests/` runs in ~0.5s
 - **Mock mode** for development without a running VLM
 - **Configurable** model, temperature, timeout, num_predict, upscale threshold via environment variables
 - **50MB image limit** with format auto-detection (PNG, JPEG, GIF, WebP, BMP)
 - **Zero external state** — pure proxy, no database, no caching
+
+> **Note on `ui_diff`:** v0.3.0 deliberately does NOT ship a multi-image comparison tool. A gating smoke test ([`eval_results/smoke_multi_image/result.md`](eval_results/smoke_multi_image/result.md)) showed that qwen3-vl:8b fabricates cross-image elements (claims a desktop-only egg illustration is "partially clipped" in mobile shots where it's hidden by responsive rules) on 0/3 fixture pairs. Use two `analyze_structured` calls and diff the JSONs downstream instead.
 
 ## Requirements
 
@@ -135,9 +140,25 @@ Returns a structured JSON analysis with:
 - Optional `interpretation` block (fenced from observation fields)
 - `confidence` (overall/ocr/color/layout)
 
+### `diagnose_error(image_path, error_context?, viewport_hint?)`
+
+Analyzes a screenshot showing a broken UI / error / clipping issue and proposes actionable fixes. Returns the same parse-tolerant JSON envelope as `analyze_structured` / `extract_table` (`result` holds the parsed diagnosis, or `raw` + `parse_error` if the model output didn't parse).
+
+```
+image_path:    Absolute path to the screenshot.
+error_context: Optional console/terminal/log text. When provided, it is appended
+               to the user prompt as a fenced block so the model cross-references
+               console output with what's visible.
+viewport_hint: Optional viewport class.
+```
+
+Diagnosis schema: `error_type` (enum: `layout_break`/`missing_element`/`overflow`/`clipping`/`error_message`/`crash`/`404`/`console_error`/`validation_error`/`z_index`/`other`), `description`, `affected_elements[]` (with `location`), `visible_error_text` (verbatim if present, else `null`), `suggested_fixes[]` (2–3 concrete CSS/HTML/responsive recommendations), `looks_correct` (bool — `true` only if no error visible), `confidence`.
+
+Sample real-call output is captured in [`eval_results/diagnose_error_smoke/`](eval_results/diagnose_error_smoke/).
+
 ### `check_vlm_status()`
 
-Health check — verifies Ollama connectivity and reports server config (URL, model, temperature, num_predict, upscale threshold).
+Health check — verifies Ollama connectivity and reports server config (`version`, `tools_available`, URL, model, full sampling profile, prefill flag, upscale threshold) plus the list of models the Ollama backend reports.
 
 ## Usage Examples
 
@@ -177,7 +198,8 @@ Set `VISION_MOCK=1` to get canned responses without calling Ollama. Useful for d
 | `VLM_SEED` | `42` | Pin random seed for reproducible outputs (set empty to use random) |
 | `VLM_NUM_BATCH` | `1024` | Tokens processed per batch on the GPU during prompt eval |
 | `VLM_NUM_KEEP` | `0` | Number of tokens to keep from the previous request (0 = clean state per request) |
-| `VLM_PREFILL_THINKING_CLOSE` | `1` | Append assistant turn with `</think>\n\n` so reasoning VLMs (qwen3-vl, etc.) skip thinking and emit response directly. Set `0` only for non-reasoning models |
+| `VLM_PREFILL_THINKING_CLOSE` | `1` | Append assistant turn with `</think>\n\n` so reasoning VLMs (qwen3-vl, etc.) skip thinking and emit response directly. Set `0` only for non-reasoning models. **Required for multi-image too** — without it, two-image calls also return empty content |
+| `VLM_LOG_LEVEL` | `WARNING` | Logger level for `vision_sidecar` (Python `logging` standard names). Set to `INFO` to surface BLOCK markers (`[VisionSidecar][module][fn][BLOCK_NAME] k=v`) — useful for tracing tool dispatch, ollama calls, parse fallbacks. `DEBUG` adds full preprocess + sampling dumps |
 | `VISION_UPSCALE_BELOW_WIDTH` | `400` | Auto-upscale images whose width is ≤ this (px) |
 | `VISION_UPSCALE_FACTOR` | `2` | Upscale multiplier when triggered (Lanczos resampling) |
 | `VISION_MOCK` | `1` | `1` = mock responses, `0` = real VLM calls |
@@ -199,18 +221,56 @@ All models require an Ollama server with sufficient RAM/VRAM.
 - Text output quality depends on the VLM model — larger models produce better analysis
 - No streaming — full response is returned after VLM completes
 
+## Development
+
+```bash
+uv sync --extra dev      # install pytest
+pytest tests/            # 44 module-level checks, no Ollama required, ~0.5s
+```
+
+`tests/` contains deterministic mock-mode checks for the JSON parser, Lanczos upscale, env-var resolution, log markers, and tool dispatch. Run before any pull request.
+
 ## Architecture
 
 ```
 vision-sidecar-mcp/
-├── pyproject.toml           # Dependencies and entry point
-├── README.md                # This file
-├── USAGE.md                 # Detailed workflows and tips
-├── LICENSE                  # MIT
-└── vision_sidecar/
-    ├── __init__.py
-    └── server.py            # FastMCP server with 4 tools
+├── pyproject.toml                           # Dependencies and entry point
+├── README.md                                # This file
+├── USAGE.md                                 # Detailed workflows and tips
+├── LICENSE                                  # MIT
+├── vision_sidecar/
+│   ├── __init__.py
+│   └── server.py                            # FastMCP server with 7 tools
+├── tests/                                   # pytest mock-mode checks
+│   ├── conftest.py
+│   ├── test_parse.py
+│   ├── test_image.py
+│   ├── test_config.py
+│   ├── test_logging.py
+│   └── test_diagnose.py
+├── eval_scripts/
+│   └── run_multi_image_smoke.py             # VF-006 gating runner
+├── eval_images/kombo/                       # 10-shot eval dataset
+└── eval_results/
+    ├── kombo/                               # cycle-1 baseline
+    ├── kombo_after_tuning/                  # cycle-2 (v0.2.2)
+    ├── opus_groundtruth/                    # frontier ground truth
+    ├── zai/                                 # cloud GLM 4-way comparison
+    ├── smoke_multi_image/                   # ui_diff gate decision
+    ├── diagnose_error_smoke/                # diagnose_error real-call evidence
+    └── v030_release_evidence.md             # v0.3.0 ship checklist
 ```
+
+## Evaluation
+
+The `eval_results/` tree records a multi-stack comparison on a 10-screenshot dataset captured from a real marketing site (`eval_images/kombo/`). `eval_results/zai/aggregate_4way_comparison.md` summarizes the four columns:
+
+- **Opus 4.7** (frontier ceiling) — composite **5.0**
+- **local-tuned (v0.2.2/v0.3.0)** — composite **4.1** (~82% of frontier)
+- **zai cloud (GLM)** — composite **3.9** (~78% of frontier)
+- **local-baseline (pre-tuning)** — composite **3.1** (~62% of frontier)
+
+The tuned local model slightly outperforms the GLM-backed cloud VLM on aggregate. Residual gap to frontier sits in three known places: subtle color discrimination (e.g. distinguishing a deliberately greyed eyebrow from a purple one), exact wrap-line counting on mobile H1s, and design-intent inference. v0.3.0 is purely additive to v0.2.2 and does not change these numbers — see [`eval_results/v030_release_evidence.md`](eval_results/v030_release_evidence.md) for the no-regression rationale.
 
 ## License
 
