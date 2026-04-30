@@ -25,6 +25,11 @@ dependencies = [
     "pillow>=10.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/xronocode/vision-sidecar-mcp"
 Repository = "https://github.com/xronocode/vision-sidecar-mcp"
