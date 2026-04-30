@@ -1,0 +1,27 @@
+{
+  "table_content": {
+    "present": true,
+    "row_count": 4,
+    "col_count": 2,
+    "header_row": ["", "kombo", "Prodigy"],
+    "rows": [
+      ["Scope", "Focused on math facts", "Full curriculum K-8"],
+      ["Core skill", "Speed and retention", "Conceptual understanding"],
+      ["Complexity", "Start in 5 seconds", "Setup and onboarding"],
+      ["Philosophy", "Free, no ads, no paywalls", "Freemium with membership"]
+    ]
+  },
+  "glyphs_and_icons_correct": ["✦ in 'Earn ✦ Sparks'"],
+  "below_fold_or_clipped": {"appears_clipped": false},
+  "numbers_dates_amounts": ["5"],
+  "_notes_misses": [
+    "col_count=2 (wrong; should be 3: row_label + kombo + Prodigy)",
+    "Listed table cells flat (no row-label binding) in initial extraction; corrected via 'rows' array",
+    "FOR TEACHERS eyebrow correctly seen as gray here"
+  ],
+  "_notes_correct": [
+    "Full table content correct",
+    "✦ glyph preserved",
+    "5 captured as a number"
+  ]
+}

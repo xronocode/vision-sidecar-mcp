@@ -1,0 +1,16 @@
+{
+  "visible_text_summary": "All FOR KIDS / FOR PARENTS / FOR TEACHERS bodies + waitlist links + HOW IT WORKS step cards extracted",
+  "table_content": {"present": false},
+  "glyphs_and_icons_correct": ["✦ in 'Earn ✦ Sparks'", "→ in both waitlist links"],
+  "below_fold_or_clipped": {"appears_clipped": false, "evidence": "All content visible"},
+  "_notes_misses": [
+    "FOR TEACHERS eyebrow color = PURPLE (wrong — it is grey, distinct from FOR KIDS/PARENTS purple)",
+    "appears_clipped=false but the WHY KOMBO comparison table below the step cards is not in frame — actually IS clipped"
+  ],
+  "_notes_correct": [
+    "✦ glyph preserved verbatim",
+    "→ glyphs preserved",
+    "all 4 step cards extracted with names",
+    "OCR of all body text accurate"
+  ]
+}

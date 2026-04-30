@@ -1,0 +1,15 @@
+{
+  "visible_text_summary": "Top nav (Kombo capitalized — wrong, actual lowercase 'kombo'), READY TO PLAY, H1 split into 4 lines correctly, subhead split, 3 CTAs, FOR KIDS",
+  "h1_wrap_lines": ["The math", "RPG where", "you build a", "kingdom"],
+  "glyphs_and_icons": ["em dash in subhead block 12 only"],
+  "below_fold_or_clipped": {"appears_clipped": true, "evidence": "FOR KIDS section incomplete at bottom"},
+  "_notes_correct": [
+    "H1 wrap captured precisely (4 lines) — frontier-level",
+    "Clipping correctly flagged"
+  ],
+  "_notes_misses": [
+    "'Start playing' text marked white (wrong, near-black)",
+    "Logo capitalized 'Kombo' instead of actual lowercase 'kombo'",
+    "Em dash in 'Not a test — an adventure' missed"
+  ]
+}

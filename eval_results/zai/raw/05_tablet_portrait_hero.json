@@ -1,0 +1,16 @@
+{
+  "visible_text_summary": "Top nav (Kombo logo seen) + READY TO PLAY eyebrow + H1 + subhead + 3 CTAs + No sign-up + FOR KIDS/PARENTS sections + parent waitlist link",
+  "table_content": {"present": false},
+  "glyphs_and_icons_correct": ["→ in waitlist link"],
+  "below_fold_or_clipped": {"appears_clipped": false, "evidence": "Content extends to bottom edge with no truncation"},
+  "_notes_misses": [
+    "appears_clipped=FALSE — WRONG. FOR TEACHERS section, HOW IT WORKS, and WHY KOMBO table are below the fold",
+    "'Start playing' text marked WHITE (wrong, near-black)",
+    "Missed em dash in subhead and H2 ('Not a test — an adventure') — only counted → arrow"
+  ],
+  "_notes_correct": [
+    "Full text OCR accurate",
+    "Detected 'Kombo' logo (capitalized though — actual is lowercase 'kombo')",
+    "All 3 CTAs identified"
+  ]
+}

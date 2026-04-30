@@ -1,0 +1,27 @@
+{
+  "visible_text": [
+    {"block_id": 1, "role": "nav", "text": "Play", "x_position": "right", "color_descriptor": "black", "weight": "normal"},
+    {"block_id": 2, "role": "nav", "text": "Progress", "x_position": "right", "color_descriptor": "black", "weight": "normal"},
+    {"block_id": 3, "role": "eyebrow", "text": "READY TO PLAY", "x_position": "left", "color_descriptor": "purple", "weight": "normal"},
+    {"block_id": 4, "role": "heading_h1", "text": "The math RPG where you build a kingdom", "x_position": "left", "color_descriptor": "black", "weight": "bold"},
+    {"block_id": 5, "role": "body", "text": "Practice multiplication and division, earn sparks, and grow your kingdom — one kombo at a time.", "x_position": "left", "color_descriptor": "gray", "weight": "normal"},
+    {"block_id": 6, "role": "button_label", "text": "Start playing", "x_position": "left", "color_descriptor": "white", "weight": "normal"},
+    {"block_id": 7, "role": "button_label", "text": "I'm a parent", "x_position": "left", "color_descriptor": "black", "weight": "normal"},
+    {"block_id": 8, "role": "button_label", "text": "I'm a teacher", "x_position": "left", "color_descriptor": "black", "weight": "normal"},
+    {"block_id": 9, "role": "body", "text": "No sign-up required", "x_position": "left", "color_descriptor": "gray", "weight": "normal"},
+    {"block_id": 10, "role": "heading_h3", "text": "FOR KIDS", "x_position": "left", "color_descriptor": "purple", "weight": "normal"},
+    {"block_id": 11, "role": "heading_h2", "text": "Not a test — an adventure", "x_position": "left", "color_descriptor": "black", "weight": "bold"},
+    {"block_id": 12, "role": "body", "text": "Solve math problems to earn sparks. Use sparks to build your kingdom. Each correct answer makes your world bigger.", "x_position": "left", "color_descriptor": "gray", "weight": "normal"},
+    {"block_id": 13, "role": "heading_h3", "text": "FOR PARENTS", "x_position": "left", "color_descriptor": "purple", "weight": "normal"},
+    {"block_id": 14, "role": "heading_h2", "text": "Math practice without the nagging", "x_position": "left", "color_descriptor": "black", "weight": "bold"}
+  ],
+  "table_content": {"present": false, "row_count": 0, "col_count": 0, "header_row": [], "rows": []},
+  "glyphs_and_icons": [{"in_block": 4, "glyph": "—", "shape_description": "em dash"}],
+  "below_fold_or_clipped": {"appears_clipped": true, "evidence": "FOR PARENTS section is partially visible at the bottom edge"},
+  "_notes_misses": [
+    "Missed 'kombo' nav logo (left side)",
+    "Says 'Start playing' button text is WHITE (wrong — it's near-black on purple pill)",
+    "FOR KIDS / FOR PARENTS classified as heading_h3 (eyebrows, not headings)"
+  ],
+  "_notes_correct": ["em dash preserved", "clipping correctly flagged", "OCR of all body/heading text accurate"]
+}

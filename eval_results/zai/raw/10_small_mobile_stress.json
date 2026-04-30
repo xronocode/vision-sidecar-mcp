@@ -1,0 +1,20 @@
+{
+  "visible_text_summary": "Top nav (kombo correct lowercase), READY TO PLAY, H1 (NOT split — given as single string), subhead one line",
+  "h1_wrap_lines_captured": false,
+  "h1_text_returned": "The math RPG where you build a kingdom",
+  "below_fold_or_clipped": {
+    "appears_clipped": true,
+    "evidence": "320px viewport, no CTAs visible",
+    "expected_missing_elements": ["Start playing button", "I'm a parent button", "I'm a teacher button"]
+  },
+  "_notes_correct": [
+    "Clipping correctly flagged with specific missing CTAs listed",
+    "Logo lowercase 'kombo' here (vs 'Kombo' on file 07)",
+    "em dash preserved in subhead"
+  ],
+  "_notes_misses": [
+    "H1 NOT split into 5 wrap lines (frontier sees: 'The math' / 'RPG' / 'where you' / 'build a' / 'kingdom')",
+    "Subhead clipping at bottom edge not flagged (only mid-paragraph, ends abruptly)",
+    "Confused 'Play'/'Progress' text labels as glyphs in glyphs_and_icons array"
+  ]
+}

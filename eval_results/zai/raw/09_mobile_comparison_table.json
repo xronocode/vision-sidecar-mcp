@@ -1,0 +1,32 @@
+{
+  "visible_text_summary": "4 step cards with per-card pastel colors detected, full WHY KOMBO table",
+  "step_cards_pastel_colors": {
+    "Practice math": "light purple",
+    "Earn ✦ Sparks": "light yellow",
+    "Build kingdom": "light teal",
+    "Want more": "light pink"
+  },
+  "table_content": {
+    "present": true,
+    "row_count": 5,
+    "col_count": 3,
+    "header_row": ["", "kombo", "Prodigy"],
+    "rows": [
+      {"row_label": "Scope", "kombo_value": "Focused on math facts", "prodigy_value": "Full curriculum K-8"},
+      {"row_label": "Core skill", "kombo_value": "Speed and retention", "prodigy_value": "Conceptual understanding"},
+      {"row_label": "Complexity", "kombo_value": "Start in 5 seconds", "prodigy_value": "Setup and onboarding"},
+      {"row_label": "Philosophy", "kombo_value": "Free, no ads, no paywalls", "prodigy_value": "Freemium with membership"}
+    ]
+  },
+  "glyphs_and_icons": ["✦ preserved in 'Earn ✦ Sparks'"],
+  "below_fold_or_clipped": {"appears_clipped": false, "evidence": "all content visible"},
+  "_notes_correct": [
+    "BEST per-card color attribution in dataset (frontier-level): 4/4 distinct pastel colors",
+    "Table structure with row_label/kombo_value/prodigy_value (richer than flat rows)",
+    "All cell text correct",
+    "✦ preserved"
+  ],
+  "_notes_misses": [
+    "row_count=5 wrong (counted header; should be 4)"
+  ]
+}

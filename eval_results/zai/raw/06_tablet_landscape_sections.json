@@ -1,0 +1,14 @@
+{
+  "visible_text_summary": "FOR KIDS / FOR PARENTS / FOR TEACHERS sections + both waitlist links",
+  "glyphs_and_icons_correct": ["em dash in 3 bodies", "→ in both waitlist links"],
+  "below_fold_or_clipped": {"appears_clipped": true, "evidence": "bottom edge cuts content"},
+  "_notes_misses": [
+    "FOR TEACHERS eyebrow marked PURPLE (wrong — gray)",
+    "Sections labelled as 'heading' instead of 'eyebrow'"
+  ],
+  "_notes_correct": [
+    "Clipping correctly flagged",
+    "All em dashes preserved",
+    "All → arrows preserved"
+  ]
+}

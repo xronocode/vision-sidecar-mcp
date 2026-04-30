@@ -1,0 +1,26 @@
+{
+  "table_content": {
+    "present": true,
+    "row_count": 4,
+    "col_count": 3,
+    "header_row": ["Scope", "kombo", "Prodigy"],
+    "rows": [
+      ["Focused on math facts", "Full curriculum K-8"],
+      ["Speed and retention", "Conceptual understanding"],
+      ["Start in 5 seconds", "Setup and onboarding"],
+      ["Free, no ads, no paywalls", "Freemium with membership"]
+    ]
+  },
+  "glyphs_and_icons_correct": ["✦ in 'Earn ✦ Sparks'"],
+  "below_fold_or_clipped": {"appears_clipped": false},
+  "_notes_misses": [
+    "header_row WRONG: Scope is a row label, not a column header. Should be ['', 'kombo', 'Prodigy']",
+    "rows have only 2 cells each, missing row labels",
+    "Different table structure interpretation than file 03 (same pixels)"
+  ],
+  "_notes_correct": [
+    "FOR TEACHERS eyebrow gray here",
+    "All cell text correct",
+    "Recognizes 'kombo' lowercase logo"
+  ]
+}

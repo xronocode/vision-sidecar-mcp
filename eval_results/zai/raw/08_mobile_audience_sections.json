@@ -1,0 +1,14 @@
+{
+  "visible_text_summary": "FOR KIDS / FOR PARENTS (with waitlist link) / FOR TEACHERS sections",
+  "for_teachers_eyebrow_color": "grey",
+  "below_fold_or_clipped": {"appears_clipped": false, "evidence": "all 3 sections visible"},
+  "_notes_correct": [
+    "FOR TEACHERS eyebrow correctly marked GREY (only zai run that got this right out of 02/06/08 mobile views)",
+    "→ in waitlist link preserved"
+  ],
+  "_notes_misses": [
+    "appears_clipped=false WRONG — 'Join the teacher waitlist →' link below visible body is clipped",
+    "Body text marked black instead of muted-grey",
+    "Other em dashes (in body texts) not catalogued"
+  ]
+}
