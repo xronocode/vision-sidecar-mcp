@@ -21,6 +21,10 @@ uv.lock
 # Playwright MCP transient outputs
 .playwright-mcp/
 
+# Local persistent telemetry (vision_sidecar/telemetry.py)
+.telemetry/
+.vision-sidecar-telemetry/
+
 # Internal-only setup notes (contains private infrastructure references)
 SETUP_INTERNAL.md
 

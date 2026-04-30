@@ -14,6 +14,8 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 from PIL import Image
 
+from vision_sidecar import telemetry as _tm
+
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 VLM_MODEL = os.environ.get("VLM_MODEL", "minicpm-v")
 VLM_TIMEOUT = float(os.environ.get("VLM_TIMEOUT", "180"))
@@ -420,6 +422,13 @@ def _encode_image(path: str) -> tuple[str, str, dict]:
         image_sha256=sha, raw_bytes=len(raw), processed_bytes=len(processed),
         b64_chars=len(b64),
     )
+    _tm.event_field(
+        image_sha256=sha,
+        image_bytes=len(raw),
+        processed_bytes=len(processed),
+        upscaled=bool(preprocess_info.get("upscaled")),
+        upscale_factor=preprocess_info.get("upscale_factor"),
+    )
     return b64, mime, preprocess_info
 
 
@@ -486,6 +495,10 @@ def _call_ollama(
         prompt_chars=len(prompt), suppress_thinking=int(bool(suppress_thinking)),
         response_json=int(bool(response_json)),
     )
+    _tm.event_field(
+        model=VLM_MODEL, prompt_chars=len(prompt),
+        suppress_thinking=bool(suppress_thinking),
+    )
     _t0 = time.perf_counter()
     try:
         with httpx.Client(timeout=VLM_TIMEOUT) as client:
@@ -493,19 +506,27 @@ def _call_ollama(
             resp.raise_for_status()
             data = resp.json()
         content = data.get("message", {}).get("content", "")
+        wall = round(time.perf_counter() - _t0, 2)
         log_call(
             "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA",
             phase="exit", response_chars=len(content),
-            wall_seconds=round(time.perf_counter() - _t0, 2),
+            wall_seconds=wall,
             status="ok",
+        )
+        _tm.event_field(
+            response_chars=len(content),
+            ollama_wall_s=wall,
+            ollama_status="ok",
         )
         return content
     except httpx.TimeoutException:
+        wall = round(time.perf_counter() - _t0, 2)
         log_call(
             "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA", level=logging.WARNING,
-            phase="exit", wall_seconds=round(time.perf_counter() - _t0, 2),
+            phase="exit", wall_seconds=wall,
             status="timeout", timeout_seconds=VLM_TIMEOUT,
         )
+        _tm.event_field(ollama_wall_s=wall, ollama_status="timeout")
         return (
             f"[VLM_TIMEOUT] Ollama did not respond within {VLM_TIMEOUT}s. "
             "The image may be too large or the model too slow. "
@@ -513,20 +534,27 @@ def _call_ollama(
             "(e.g. 1920) to cap the longest side."
         )
     except httpx.ConnectError:
+        wall = round(time.perf_counter() - _t0, 2)
         log_call(
             "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA", level=logging.ERROR,
-            phase="exit", wall_seconds=round(time.perf_counter() - _t0, 2),
+            phase="exit", wall_seconds=wall,
             status="connect_error", url=OLLAMA_URL,
         )
+        _tm.event_field(ollama_wall_s=wall, ollama_status="connect_error")
         return (
             f"[VLM_CONNECT_ERROR] Cannot reach Ollama at {OLLAMA_URL}. "
             "Is the Ollama server running?"
         )
     except httpx.HTTPStatusError as exc:
+        wall = round(time.perf_counter() - _t0, 2)
         log_call(
             "ollama", "_call_ollama", "BLOCK_CALL_OLLAMA", level=logging.ERROR,
-            phase="exit", wall_seconds=round(time.perf_counter() - _t0, 2),
+            phase="exit", wall_seconds=wall,
             status="http_error", http_status=exc.response.status_code,
+        )
+        _tm.event_field(
+            ollama_wall_s=wall, ollama_status="http_error",
+            ollama_http_status=exc.response.status_code,
         )
         return (
             f"[VLM_HTTP_ERROR] Ollama returned HTTP {exc.response.status_code}: "
@@ -538,6 +566,7 @@ def _try_parse_json(raw: str) -> tuple[object | None, str | None]:
     """Best-effort JSON parse. Strips ```json fences if present. Returns (obj, error)."""
     if not raw:
         log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", level=logging.WARNING, result="empty_response")
+        _tm.event_field(parse_result="empty")
         return None, "empty response"
     s = raw.strip()
     # Strip a single fenced code block if the model wrapped its output.
@@ -547,6 +576,7 @@ def _try_parse_json(raw: str) -> tuple[object | None, str | None]:
     try:
         obj = json.loads(s)
         log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", result="ok", path="direct")
+        _tm.event_field(parse_result="ok", parse_path="direct")
         return obj, None
     except json.JSONDecodeError as e:
         # Last-ditch: find the first { and last } and try the slice.
@@ -556,10 +586,12 @@ def _try_parse_json(raw: str) -> tuple[object | None, str | None]:
             try:
                 obj = json.loads(s[start:end + 1])
                 log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", result="ok", path="brace_fallback")
+                _tm.event_field(parse_result="ok", parse_path="brace_fallback")
                 return obj, None
             except json.JSONDecodeError:
                 pass
         log_call("parse", "_try_parse_json", "BLOCK_PARSE_JSON", level=logging.WARNING, result="parse_error", err=str(e)[:80])
+        _tm.event_field(parse_result="error")
         return None, f"json parse error: {e}"
 
 
@@ -575,6 +607,7 @@ def _viewport_hint_block(viewport_hint: str | None) -> str:
 # -- Tools ---------------------------------------------------------------------
 
 @mcp.tool()
+@_tm.track("analyze_image")
 def analyze_image(
     image_path: str,
     prompt: str | None = None,
@@ -629,6 +662,7 @@ def analyze_image(
 
 
 @mcp.tool()
+@_tm.track("analyze_ui_screenshot")
 def analyze_ui_screenshot(image_path: str, viewport_hint: str | None = None) -> str:
     """Analyze a UI screenshot and extract component hierarchy.
 
@@ -676,6 +710,7 @@ def analyze_ui_screenshot(image_path: str, viewport_hint: str | None = None) -> 
 
 
 @mcp.tool()
+@_tm.track("extract_text_from_image")
 def extract_text_from_image(image_path: str) -> str:
     """Extract text content from an image (OCR-like functionality).
 
@@ -715,6 +750,7 @@ def extract_text_from_image(image_path: str) -> str:
 
 
 @mcp.tool()
+@_tm.track("extract_table")
 def extract_table(image_path: str) -> str:
     """Extract a table from a screenshot as JSON (header_row + rows).
 
@@ -780,6 +816,7 @@ def extract_table(image_path: str) -> str:
 
 
 @mcp.tool()
+@_tm.track("analyze_structured")
 def analyze_structured(image_path: str, viewport_hint: str | None = None) -> str:
     """Return a structured JSON analysis of a screenshot.
 
@@ -834,6 +871,7 @@ def analyze_structured(image_path: str, viewport_hint: str | None = None) -> str
 
 
 @mcp.tool()
+@_tm.track("diagnose_error")
 def diagnose_error(
     image_path: str,
     error_context: str | None = None,
@@ -950,6 +988,7 @@ TOOLS_AVAILABLE = [
     "extract_table",
     "analyze_structured",
     "diagnose_error",
+    "get_telemetry",
     "check_vlm_status",
 ]
 
@@ -1024,6 +1063,73 @@ def check_vlm_status() -> str:
             "status": "error",
             "error": str(e),
         }, indent=2)
+
+
+@mcp.tool()
+def get_telemetry(
+    project_path: str | None = None,
+    raw: bool = False,
+    raw_limit: int = 100,
+) -> str:
+    """Return persistent local telemetry — aggregate snapshot or last N raw events.
+
+    Telemetry is enabled by default (`VLM_TELEMETRY=1`); set `VLM_TELEMETRY=0` to
+    fully disable. Events are written as JSONL to two locations:
+
+    1. `<server-source>/.telemetry/events-YYYY-MM-DD.jsonl` (always)
+    2. `<calling-project-root>/.vision-sidecar-telemetry/events-YYYY-MM-DD.jsonl`
+       — when the called tool's `image_path` falls inside a git repo. The server
+       also idempotently appends `.vision-sidecar-telemetry/` to the project's
+       `.gitignore` on first hit.
+
+    Args:
+        project_path: Optional path inside a git repo. When given, returns the
+            per-project snapshot (resolves project root via `.git` walk).
+            When omitted, returns the server-wide snapshot.
+        raw: If true, return the most recent `raw_limit` events instead of an
+            aggregate snapshot. Useful for debugging individual calls.
+        raw_limit: Cap on raw events (default 100, max 5000).
+
+    Returns:
+        JSON string. Schema for snapshot:
+          - computed_at, directory, first_event_ts, last_event_ts
+          - totals: { calls, by_tool, by_status, parse, errors, empty_responses, upscales }
+          - rates: { upscale_rate, empty_response_rate, error_rate }
+          - ollama_wall_seconds / total_wall_seconds / response_chars / image_bytes:
+              histograms with { count, min, max, sum, p50, p95, p99 }
+
+        Raw mode returns: { events: [...], directory, count }
+    """
+    log_call("tools", "get_telemetry", "BLOCK_DISPATCH_TOOL", tool_name="get_telemetry", scope="project" if project_path else "server", raw=int(raw))
+
+    if not _tm.is_enabled():
+        return json.dumps({
+            "telemetry_enabled": False,
+            "note": "Set VLM_TELEMETRY=1 (default) to enable persistent telemetry.",
+        }, ensure_ascii=False, indent=2)
+
+    if project_path:
+        proj_root = _tm.project_root_of(project_path)
+        if proj_root is None:
+            return json.dumps({
+                "error": "no_project_root",
+                "note": f"No .git found within {6} ancestors of {project_path}.",
+            }, ensure_ascii=False, indent=2)
+        directory = _tm.project_dir(proj_root)
+    else:
+        directory = _tm.server_dir()
+
+    if raw:
+        capped = max(1, min(int(raw_limit), 5000))
+        events = _tm.recent_events(directory, limit=capped)
+        return json.dumps({
+            "directory": str(directory),
+            "count": len(events),
+            "events": events,
+        }, ensure_ascii=False, indent=2)
+
+    snapshot = _tm.compute_snapshot(directory)
+    return json.dumps(snapshot, ensure_ascii=False, indent=2)
 
 
 def main():

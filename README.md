@@ -20,13 +20,14 @@ Designed for [Kilo Code](https://kilo.ai), but works with any MCP-compatible cli
 
 ## Features
 
-- **7 MCP tools**: `analyze_image`, `analyze_ui_screenshot`, `extract_text_from_image`, `extract_table`, `analyze_structured`, `diagnose_error`, `check_vlm_status`
+- **8 MCP tools**: `analyze_image`, `analyze_ui_screenshot`, `extract_text_from_image`, `extract_table`, `analyze_structured`, `diagnose_error`, `get_telemetry`, `check_vlm_status`
 - **Hardened extraction-only system prompt** — forbids hex-code invention, requires per-element color attribution, preserves icon glyphs (✦, →) verbatim, flags below-fold clipping
 - **`viewport_hint` parameter** (`desktop`/`tablet`/`mobile`/`small_mobile`) — viewport-aware analysis with explicit clipping checks for narrow viewports
 - **Auto-upscale** for narrow screenshots (≤400px wide) using Pillow Lanczos 2× — improves OCR on tight mobile layouts
 - **Structured JSON output** via `analyze_structured` — schema with `glyphs_and_icons`, `below_fold_or_clipped`, per-block color descriptors, and a fenced `interpretation` block
 - **Error / broken-UI diagnosis** via `diagnose_error` — returns structured JSON with `error_type`, `affected_elements`, `suggested_fixes`; optional `error_context` for cross-referencing console/log output
 - **Structured logging** with 7 GRACE BLOCK markers (`BLOCK_VALIDATE_IMAGE`, `BLOCK_UPSCALE`, `BLOCK_ENCODE_IMAGE`, `BLOCK_CALL_OLLAMA`, `BLOCK_PARSE_JSON`, `BLOCK_PROBE_OLLAMA`, `BLOCK_DISPATCH_TOOL`) — opt-in via `VLM_LOG_LEVEL=INFO`
+- **Persistent local telemetry** (default ON) — every tool call written as JSONL to `<server>/.telemetry/` and (when image_path is inside a git repo) also to `<repo>/.vision-sidecar-telemetry/`. Aggregate snapshots with p50/p95/p99 latency and per-tool / per-status breakdown via the `get_telemetry` tool. Survives MCP daemon restarts. Disable via `VLM_TELEMETRY=0`
 - **44 module-level tests** in `tests/` (no Ollama required) — `pytest tests/` runs in ~0.5s
 - **Mock mode** for development without a running VLM
 - **Configurable** model, temperature, timeout, num_predict, upscale threshold via environment variables
@@ -156,6 +157,26 @@ Diagnosis schema: `error_type` (enum: `layout_break`/`missing_element`/`overflow
 
 Sample real-call output is captured in [`eval_results/diagnose_error_smoke/`](eval_results/diagnose_error_smoke/).
 
+### `get_telemetry(project_path?, raw?, raw_limit?)`
+
+Returns a snapshot of persistent local telemetry — counters, per-tool breakdown, latency / response / image-size histograms with p50/p95/p99.
+
+```
+project_path: Optional path inside a git repo. When given, returns the
+              per-project snapshot from <repo-root>/.vision-sidecar-telemetry/
+              instead of the server-global snapshot.
+raw:          If true, returns the most recent `raw_limit` events as a list
+              instead of the aggregate.
+raw_limit:    Cap on raw events (default 100, max 5000).
+```
+
+Snapshot schema includes:
+- `totals` — `calls`, `by_tool`, `by_status`, `parse`, `errors`, `empty_responses`, `upscales`
+- `rates` — `upscale_rate`, `empty_response_rate`, `error_rate`
+- `ollama_wall_seconds`, `total_wall_seconds`, `response_chars`, `image_bytes` — each with `{ count, min, max, sum, p50, p95, p99 }`
+
+Telemetry is enabled by default. Set `VLM_TELEMETRY=0` to disable.
+
 ### `check_vlm_status()`
 
 Health check — verifies Ollama connectivity and reports server config (`version`, `tools_available`, URL, model, full sampling profile, prefill flag, upscale threshold) plus the list of models the Ollama backend reports.
@@ -200,6 +221,8 @@ Set `VISION_MOCK=1` to get canned responses without calling Ollama. Useful for d
 | `VLM_NUM_KEEP` | `0` | Number of tokens to keep from the previous request (0 = clean state per request) |
 | `VLM_PREFILL_THINKING_CLOSE` | `1` | Append assistant turn with `</think>\n\n` so reasoning VLMs (qwen3-vl, etc.) skip thinking and emit response directly. Set `0` only for non-reasoning models. **Required for multi-image too** — without it, two-image calls also return empty content |
 | `VLM_LOG_LEVEL` | `WARNING` | Logger level for `vision_sidecar` (Python `logging` standard names). Set to `INFO` to surface BLOCK markers (`[VisionSidecar][module][fn][BLOCK_NAME] k=v`) — useful for tracing tool dispatch, ollama calls, parse fallbacks. `DEBUG` adds full preprocess + sampling dumps |
+| `VLM_TELEMETRY` | `1` | Persistent local telemetry. `1` = on (default), `0` = off |
+| `VLM_TELEMETRY_DIR` | `<server>/.telemetry` | Override the server-side telemetry directory. Per-project directory (`<repo>/.vision-sidecar-telemetry/`) is always inferred from `image_path` and not configurable |
 | `VISION_UPSCALE_BELOW_WIDTH` | `400` | Auto-upscale images whose width is ≤ this (px) |
 | `VISION_UPSCALE_FACTOR` | `2` | Upscale multiplier when triggered (Lanczos resampling) |
 | `VISION_MOCK` | `1` | `1` = mock responses, `0` = real VLM calls |

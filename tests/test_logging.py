@@ -102,6 +102,7 @@ def test_check_vlm_status_exposes_version_and_tools():
         "extract_table",
         "analyze_structured",
         "diagnose_error",
+        "get_telemetry",
         "check_vlm_status",
     }
     assert set(parsed["tools_available"]) == expected_tools
