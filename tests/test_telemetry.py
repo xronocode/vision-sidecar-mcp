@@ -20,10 +20,16 @@ from pathlib import Path
 import pytest
 
 
-def _reload_telemetry(monkeypatch: pytest.MonkeyPatch, server_dir: Path):
+def _reload_telemetry(
+    monkeypatch: pytest.MonkeyPatch,
+    server_dir: Path,
+    *,
+    auto_gitignore: bool = False,
+):
     """Force telemetry to honor a custom directory + enable flag."""
     monkeypatch.setenv("VLM_TELEMETRY", "1")
     monkeypatch.setenv("VLM_TELEMETRY_DIR", str(server_dir))
+    monkeypatch.setenv("VLM_TELEMETRY_AUTO_GITIGNORE", "1" if auto_gitignore else "0")
     from vision_sidecar import telemetry
     importlib.reload(telemetry)
     return telemetry
@@ -165,9 +171,30 @@ def test_only_server_dir_when_image_outside_any_repo(tmp_path, monkeypatch):
 
 # -- gitignore auto-add --------------------------------------------------------
 
-def test_auto_adds_to_project_gitignore(tmp_path, monkeypatch):
+def test_default_does_not_touch_project_gitignore(tmp_path, monkeypatch):
+    """Default VLM_TELEMETRY_AUTO_GITIGNORE=0 must NOT mutate the project's .gitignore."""
     server_d = tmp_path / "server_tel"
-    tm = _reload_telemetry(monkeypatch, server_d)
+    tm = _reload_telemetry(monkeypatch, server_d, auto_gitignore=False)
+
+    repo = _make_repo(tmp_path, "myproj")
+    original = "node_modules/\nvenv/\n*.log\n"
+    (repo / ".gitignore").write_text(original)
+    img = repo / "shot.png"
+    img.touch()
+
+    with tm.track_call("test_tool", image_path=str(img)):
+        pass
+
+    gi = (repo / ".gitignore").read_text()
+    assert gi == original  # byte-for-byte unchanged
+    # But the telemetry directory itself was still created
+    assert (repo / ".vision-sidecar-telemetry").exists()
+
+
+def test_auto_adds_to_project_gitignore_when_enabled(tmp_path, monkeypatch):
+    """Opt-in path: VLM_TELEMETRY_AUTO_GITIGNORE=1 appends the entry."""
+    server_d = tmp_path / "server_tel"
+    tm = _reload_telemetry(monkeypatch, server_d, auto_gitignore=True)
 
     repo = _make_repo(tmp_path, "myproj")
     img = repo / "shot.png"
@@ -183,7 +210,7 @@ def test_auto_adds_to_project_gitignore(tmp_path, monkeypatch):
 
 def test_gitignore_add_is_idempotent(tmp_path, monkeypatch):
     server_d = tmp_path / "server_tel"
-    tm = _reload_telemetry(monkeypatch, server_d)
+    tm = _reload_telemetry(monkeypatch, server_d, auto_gitignore=True)
 
     repo = _make_repo(tmp_path, "myproj")
     (repo / ".gitignore").write_text("__pycache__/\n.vision-sidecar-telemetry/\n")
@@ -200,7 +227,7 @@ def test_gitignore_add_is_idempotent(tmp_path, monkeypatch):
 
 def test_gitignore_preserves_existing_user_content(tmp_path, monkeypatch):
     server_d = tmp_path / "server_tel"
-    tm = _reload_telemetry(monkeypatch, server_d)
+    tm = _reload_telemetry(monkeypatch, server_d, auto_gitignore=True)
 
     repo = _make_repo(tmp_path, "myproj")
     original = "node_modules/\nvenv/\n*.log\n"

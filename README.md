@@ -223,6 +223,7 @@ Set `VISION_MOCK=1` to get canned responses without calling Ollama. Useful for d
 | `VLM_LOG_LEVEL` | `WARNING` | Logger level for `vision_sidecar` (Python `logging` standard names). Set to `INFO` to surface BLOCK markers (`[VisionSidecar][module][fn][BLOCK_NAME] k=v`) — useful for tracing tool dispatch, ollama calls, parse fallbacks. `DEBUG` adds full preprocess + sampling dumps |
 | `VLM_TELEMETRY` | `1` | Persistent local telemetry. `1` = on (default), `0` = off |
 | `VLM_TELEMETRY_DIR` | `<server>/.telemetry` | Override the server-side telemetry directory. Per-project directory (`<repo>/.vision-sidecar-telemetry/`) is always inferred from `image_path` and not configurable |
+| `VLM_TELEMETRY_AUTO_GITIGNORE` | `0` | When `1`, the sidecar idempotently appends `.vision-sidecar-telemetry/` to your project's `.gitignore` on first hit. Default OFF — opt-in only, since this mutates a file outside the sidecar's repo. Add the entry to your project's `.gitignore` manually if you don't enable this |
 | `VISION_UPSCALE_BELOW_WIDTH` | `400` | Auto-upscale images whose width is ≤ this (px) |
 | `VISION_UPSCALE_FACTOR` | `2` | Upscale multiplier when triggered (Lanczos resampling) |
 | `VISION_MOCK` | `1` | `1` = mock responses, `0` = real VLM calls |

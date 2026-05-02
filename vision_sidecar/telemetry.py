@@ -35,6 +35,10 @@ from typing import Any, Callable, Iterator, TypeVar
 
 _ENABLED = os.environ.get("VLM_TELEMETRY", "1") == "1"
 _SERVER_DIR_OVERRIDE = os.environ.get("VLM_TELEMETRY_DIR")
+# Default OFF — sidecar should not silently mutate user repos. Set to "1" to
+# opt in to having `.vision-sidecar-telemetry/` appended to the project's
+# .gitignore on first hit.
+_AUTO_GITIGNORE = os.environ.get("VLM_TELEMETRY_AUTO_GITIGNORE", "0") == "1"
 _PROJECT_DIR_NAME = ".vision-sidecar-telemetry"
 _SERVER_DIR_NAME = ".telemetry"
 _PROJECT_ROOT_MAX_WALK = 6  # how many ancestors of image_path to scan for .git
@@ -224,7 +228,8 @@ def _write_event(ev: dict[str, Any], project_root: Path | None) -> None:
     if project_root is not None:
         proj_d = project_dir(project_root)
         _ensure_dir(proj_d)
-        _maybe_add_to_project_gitignore(project_root)
+        if _AUTO_GITIGNORE:
+            _maybe_add_to_project_gitignore(project_root)
         with (proj_d / fname).open("a", encoding="utf-8") as f:
             f.write(line)
 
