@@ -15,6 +15,7 @@ from mcp.server.fastmcp import FastMCP
 from PIL import Image
 
 from vision_sidecar import telemetry as _tm
+from vision_sidecar.backends import backend_status, run_vlm
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 VLM_MODEL = os.environ.get("VLM_MODEL", "minicpm-v")
@@ -606,6 +607,37 @@ def _viewport_hint_block(viewport_hint: str | None) -> str:
 
 # -- Tools ---------------------------------------------------------------------
 
+
+def _dispatch(
+    image_path: str,
+    image_b64: str,
+    mime: str,
+    prompt: str,
+    *,
+    response_json: bool = False,
+    num_predict: int = VLM_NUM_PREDICT,
+    system_prompt: str = SYSTEM_PROMPT,
+    temperature: float = VLM_TEMPERATURE,
+    suppress_thinking: bool | None = None,
+) -> tuple[str, dict]:
+    """Route a vision request through the backend layer (local MLX -> z.ai fallback).
+
+    Returns (content, meta). meta carries `backend` and `model` for the tool envelope.
+    `ollama_fn=_call_ollama` keeps the legacy Ollama backend reachable when VLM_BACKEND=ollama.
+    """
+    return run_vlm(
+        image_path=image_path,
+        image_b64=image_b64,
+        mime=mime,
+        prompt=prompt,
+        system_prompt=system_prompt,
+        num_predict=num_predict,
+        temperature=temperature,
+        response_json=response_json,
+        suppress_thinking=suppress_thinking if suppress_thinking is not None else True,
+        ollama_fn=_call_ollama,
+    )
+
 @mcp.tool()
 @_tm.track("analyze_image")
 def analyze_image(
@@ -645,16 +677,17 @@ def analyze_image(
             "analysis": MOCK_ANALYSIS,
         }, ensure_ascii=False, indent=2)
 
-    image_b64, _, preprocess = _encode_image(image_path)
+    image_b64, mime, preprocess = _encode_image(image_path)
     user_prompt = (
         _viewport_hint_block(viewport_hint)
         + (prompt or "Describe this image accurately. Extract all visible text, UI elements, layout structure, buttons, labels, numbers, and any visible table content. Mark uncertainty explicitly. Preserve glyphs exactly. State whether content appears clipped at the bottom edge.")
     )
-    result = _call_ollama(image_b64, user_prompt)
+    result, bmeta = _dispatch(image_path, image_b64, mime, user_prompt)
 
     return json.dumps({
         "image": meta,
-        "model": VLM_MODEL,
+        "model": bmeta.get("model", VLM_MODEL),
+        "backend": bmeta.get("backend"),
         "preprocess": preprocess,
         "viewport_hint": viewport_hint,
         "analysis": result,
@@ -696,13 +729,14 @@ def analyze_ui_screenshot(image_path: str, viewport_hint: str | None = None) -> 
         "Format as structured markdown. Do not invent hex codes."
     )
 
-    image_b64, _, preprocess = _encode_image(image_path)
+    image_b64, mime, preprocess = _encode_image(image_path)
     user_prompt = _viewport_hint_block(viewport_hint) + base_prompt
-    result = _call_ollama(image_b64, user_prompt)
+    result, bmeta = _dispatch(image_path, image_b64, mime, user_prompt)
 
     return json.dumps({
         "image": meta,
-        "model": VLM_MODEL,
+        "model": bmeta.get("model", VLM_MODEL),
+        "backend": bmeta.get("backend"),
         "preprocess": preprocess,
         "viewport_hint": viewport_hint,
         "ui_analysis": result,
@@ -738,12 +772,13 @@ def extract_text_from_image(image_path: str) -> str:
         "Output only the transcribed text, nothing else."
     )
 
-    image_b64, _, preprocess = _encode_image(image_path)
-    result = _call_ollama(image_b64, prompt)
+    image_b64, mime, preprocess = _encode_image(image_path)
+    result, bmeta = _dispatch(image_path, image_b64, mime, prompt)
 
     return json.dumps({
         "image": meta,
-        "model": VLM_MODEL,
+        "model": bmeta.get("model", VLM_MODEL),
+        "backend": bmeta.get("backend"),
         "preprocess": preprocess,
         "extracted_text": result,
     }, ensure_ascii=False, indent=2)
@@ -796,13 +831,14 @@ def extract_table(image_path: str) -> str:
         "- Preserve numbers and letter grades verbatim ('K-8' stays 'K-8', '5 seconds' stays '5 seconds')."
     )
 
-    image_b64, _, preprocess = _encode_image(image_path)
-    raw = _call_ollama(image_b64, prompt, response_json=True, num_predict=VLM_NUM_PREDICT)
+    image_b64, mime, preprocess = _encode_image(image_path)
+    raw, bmeta = _dispatch(image_path, image_b64, mime, prompt, response_json=True, num_predict=VLM_NUM_PREDICT)
     parsed, parse_error = _try_parse_json(raw)
 
     body: dict = {
         "image": meta,
-        "model": VLM_MODEL,
+        "model": bmeta.get("model", VLM_MODEL),
+        "backend": bmeta.get("backend"),
         "preprocess": preprocess,
     }
     if parsed is not None:
@@ -849,14 +885,15 @@ def analyze_structured(image_path: str, viewport_hint: str | None = None) -> str
             "result": MOCK_STRUCTURED_JSON,
         }, ensure_ascii=False, indent=2)
 
-    image_b64, _, preprocess = _encode_image(image_path)
+    image_b64, mime, preprocess = _encode_image(image_path)
     user_prompt = _viewport_hint_block(viewport_hint) + STRUCTURED_SCHEMA_HINT
-    raw = _call_ollama(image_b64, user_prompt, response_json=True)
+    raw, bmeta = _dispatch(image_path, image_b64, mime, user_prompt, response_json=True)
     parsed, parse_error = _try_parse_json(raw)
 
     body: dict = {
         "image": meta,
-        "model": VLM_MODEL,
+        "model": bmeta.get("model", VLM_MODEL),
+        "backend": bmeta.get("backend"),
         "preprocess": preprocess,
         "viewport_hint": viewport_hint,
     }
@@ -917,7 +954,7 @@ def diagnose_error(
             "result": MOCK_DIAGNOSIS,
         }, ensure_ascii=False, indent=2)
 
-    image_b64, _, preprocess = _encode_image(image_path)
+    image_b64, mime, preprocess = _encode_image(image_path)
 
     context_block = ""
     if error_context:
@@ -933,12 +970,13 @@ def diagnose_error(
         + context_block
     )
 
-    raw = _call_ollama(image_b64, user_prompt, response_json=True)
+    raw, bmeta = _dispatch(image_path, image_b64, mime, user_prompt, response_json=True)
     parsed, parse_error = _try_parse_json(raw)
 
     body: dict = {
         "image": meta,
-        "model": VLM_MODEL,
+        "model": bmeta.get("model", VLM_MODEL),
+        "backend": bmeta.get("backend"),
         "preprocess": preprocess,
         "viewport_hint": viewport_hint,
         "error_context": error_context,
@@ -1003,6 +1041,7 @@ def check_vlm_status() -> str:
     config_block = {
         "version": SERVER_VERSION,
         "tools_available": TOOLS_AVAILABLE,
+        "backends": backend_status(),
         "ollama_url": OLLAMA_URL,
         "vlm_model": VLM_MODEL,
         "vlm_temperature": VLM_TEMPERATURE,
