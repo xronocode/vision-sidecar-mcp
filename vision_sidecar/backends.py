@@ -67,6 +67,9 @@ from vision_sidecar import telemetry as _tm
 # -- Backend selection ---------------------------------------------------------
 VLM_BACKEND = os.environ.get("VLM_BACKEND", "auto").strip().lower()
 # auto | mlx | zai | ollama | mock
+# Cloud fallback in auto mode is opt-in: images leave the machine only when
+# the user explicitly allows it. VLM_BACKEND=zai stays an explicit choice.
+VLM_ALLOW_CLOUD = os.environ.get("VLM_ALLOW_CLOUD", "").strip().lower() in ("1", "true", "yes")
 
 # -- Local MLX backend (mlx-vlm) ----------------------------------------------
 MLX_MODEL = os.environ.get("MLX_MODEL", "mlx-community/gemma-3-12b-it-4bit")
@@ -487,6 +490,13 @@ def run_vlm(
     # ---- auto: local MLX first, z.ai fallback, with a GPU-contention guard ----
     busy, reason = gpu_busy()
     if busy:
+        if not VLM_ALLOW_CLOUD:
+            _log("BLOCK_DISPATCH", level=logging.WARNING, route="mlx_busy", reason=reason, cloud="blocked")
+            return (
+                f"[VLM_ERROR] Local GPU is busy ({reason}) and cloud fallback is disabled. "
+                "Free the GPU, or set VLM_ALLOW_CLOUD=1 to permit the z.ai fallback.",
+                {**meta, "backend": "error"},
+            )
         _log("BLOCK_DISPATCH", level=logging.INFO, route="mlx->zai", reason=reason)
         unload_mlx()
         content = call_zai(
@@ -515,6 +525,13 @@ def run_vlm(
             _MLX_BROKEN = True
         _log("BLOCK_DISPATCH", level=logging.WARNING, route="mlx_failed->zai", error=str(e)[:160])
         unload_mlx()
+        if not VLM_ALLOW_CLOUD:
+            return (
+                f"[VLM_ERROR] Local MLX failed ({type(e).__name__}: {str(e)[:120]}) "
+                "and cloud fallback is disabled. Set VLM_ALLOW_CLOUD=1 to permit "
+                "the z.ai fallback.",
+                {**meta, "backend": "error"},
+            )
         try:
             content = call_zai(
                 image_b64, mime, prompt,

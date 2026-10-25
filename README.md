@@ -210,6 +210,8 @@ Set `VISION_MOCK=1` to get canned responses without calling Ollama. Useful for d
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API URL |
 | `VLM_MODEL` | `minicpm-v` | Vision model name in Ollama |
 | `VLM_TIMEOUT` | `120` | Request timeout in seconds |
+| `VLM_BACKEND` | `auto` | Backend selector: `auto` (local MLX first), `mlx`, `zai`, `ollama`, `mock` |
+| `VLM_ALLOW_CLOUD` | (unset) | `1` permits the z.ai cloud fallback in `auto` mode. Without it, a busy GPU or an MLX error returns an error instead of uploading the image to a third-party API. `VLM_BACKEND=zai` is an explicit choice and is not gated |
 | `VLM_TEMPERATURE` | `0.1` | Sampling temperature (lower = more deterministic extraction) |
 | `VLM_NUM_PREDICT` | `8192` | Max output tokens (raised to fit dense schema responses) |
 | `VLM_NUM_CTX` | `32768` | Context window. Default 2048-4096 in Ollama is too small for image + schema + system prompt |
